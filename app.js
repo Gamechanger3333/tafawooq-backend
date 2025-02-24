@@ -24,7 +24,7 @@ const assessmentRoutes = require('./routes/assessRoutes');
 const app = express();
 
 const corsOptions = {
-    origin: ["http://localhost:3000"],
+    origin: ["http://localhost:3000", "https://tafawoq-backend.onrender.com"],
     methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
     allowedHeaders: "X-Requested-With, Content-Type, Authorization",
     credentials: true,
