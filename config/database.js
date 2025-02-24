@@ -11,6 +11,7 @@ process.on("uncaughtException", (err) => {
     process.exit(1);
 });
 
+//connection to the database
 const connectDB = async () => {
     try {
         const connection = await mongoose.connect(process.env.DATABASE);
