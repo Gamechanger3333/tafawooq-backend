@@ -88,19 +88,12 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // 4. Check if the user is active
-    if (!user.is_active) {
-      return res.status(403).json({ message: "Your account is inactive. Please contact support." });
-    }
-
     // 5. Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // 6. Update last login timestamp
-    user.last_login = new Date();
     await user.save();
 
     // 7. Generate JWT token
@@ -129,13 +122,9 @@ const loginUser = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    // 1. Ensure request is coming from an authorized admin (if needed)
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ message: "Unauthorized access. Admin privileges required." });
-    }
-
+   
     // 2. Retrieve active users only
-    const users = await Users.find({ is_active: true }).select('-password_hash');
+    const users = await Users.find().select('-password_hash');
 
     // 3. Check if users exist
     if (!users.length) {
@@ -235,9 +224,7 @@ const deleteUser = async (req, res) => {
 
     // 3. Proceed with deactivating the user (soft delete)
     const user = await Users.findByIdAndUpdate(
-      userId,
-      { is_active: false },
-      { new: true }
+      userId
     );
 
     // 4. Handle user not found after checking
