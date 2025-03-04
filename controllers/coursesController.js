@@ -68,11 +68,12 @@ const getAllCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
   try {
     const course = await Courses.findById(req.params.id)
-      .populate('program_subject_id')
-      .populate('tutor_id', 'first_name last_name email');
+      .populate('user_id'); // 🔥 Removed program_subject_id
+
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
+
     res.json(course);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -85,10 +86,12 @@ const updateCourse = async (req, res) => {
       req.params.id,
       req.body,
       { new: true }
-    ).populate('program_subject_id').populate('tutor_id', 'first_name last_name email');
+    ).populate('user_id');
+
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
+
     res.json(course);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -97,11 +100,9 @@ const updateCourse = async (req, res) => {
 
 const deleteCourse = async (req, res) => {
   try {
-    const course = await Courses.findByIdAndUpdate(
-      req.params.id,
-      { is_active: false },
-      { new: true }
-    );
+    const course = await Courses.findByIdAndDelete(
+      req.params.id
+    ).populate('user_id');
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
