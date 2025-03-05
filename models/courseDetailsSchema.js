@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
+const courseContentSchema = require("./courseContentSchema").schema;
 
-// Course details schema
 const courseDetailsSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -15,6 +15,7 @@ const courseDetailsSchema = new mongoose.Schema({
     type: String,
     required: [true, "Description is required"],
   },
+  content: [courseContentSchema]
 });
 
 module.exports = courseDetailsSchema;
