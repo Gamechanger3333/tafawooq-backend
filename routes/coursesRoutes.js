@@ -9,5 +9,7 @@ router.get("/", authMiddleware, authorize('tutor'), courseController.getAllCours
 router.get("/:id", authMiddleware, authorize('tutor'), courseController.getCourseById);
 router.put("/:id", authMiddleware, authorize('tutor'), courseController.updateCourse);
 router.delete("/:id", authMiddleware, authorize('tutor'), courseController.deleteCourse);
+router.post("/:courseId/content", authMiddleware, authorize('tutor'), courseController.addContentToCourse);
+router.post("/:courseId/content/:contentId/topic", authMiddleware, authorize('tutor'), courseController.addTopicToContent);
 
 module.exports = router;

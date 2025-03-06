@@ -112,4 +112,161 @@ const deleteCourse = async (req, res) => {
   }
 };
 
-module.exports = { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse };
+// Add content to a course
+const addContentToCourse = async (req, res) => {
+  try {
+    console.log(`[ADD CONTENT] Incoming request from user: ${req.user._id} - ${req.user.name}`);
+
+    const { courseId } = req.params;
+    const { title } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "Content title is required"
+      });
+    }
+
+    // Find the course
+    const course = await Courses.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+
+    // Check if user is authorized (owner of the course)
+    if (course.user_id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: You can only modify your own courses"
+      });
+    }
+
+    // Create new content object
+    const newContent = {
+      title: title,
+      topics: []
+    };
+
+    // Add content to the course
+    course.courseDetails.content.push(newContent);
+    await course.save();
+
+    console.log(`[ADD CONTENT] Content added successfully to course: ${courseId}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Content added successfully",
+      data: course
+    });
+  } catch (error) {
+    console.error(`[ADD CONTENT] Error:`, error.message);
+
+    if (error.name === "ValidationError") {
+      const errors = Object.keys(error.errors).reduce((acc, key) => {
+        acc[key] = error.errors[key].message;
+        return acc;
+      }, {});
+
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
+// Add topic to a content
+const addTopicToContent = async (req, res) => {
+  try {
+    console.log(`[ADD TOPIC] Incoming request from user: ${req.user._id} - ${req.user.name}`);
+
+    const { courseId, contentId } = req.params;
+    const { title } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "Topic title is required"
+      });
+    }
+
+    // Find the course
+    const course = await Courses.findById(courseId);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      });
+    }
+
+    // Check if user is authorized (owner of the course)
+    if (course.user_id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: You can only modify your own courses"
+      });
+    }
+
+    // Find the content
+    const content = course.courseDetails.content.id(contentId);
+    
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        message: "Content not found"
+      });
+    }
+
+    // Create new topic
+    const newTopic = {
+      title: title
+    };
+
+    // Add topic to the content
+    content.topics.push(newTopic);
+    await course.save();
+
+    console.log(`[ADD TOPIC] Topic added successfully to content: ${contentId} in course: ${courseId}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Topic added successfully",
+      data: course
+    });
+  } catch (error) {
+    console.error(`[ADD TOPIC] Error:`, error.message);
+
+    if (error.name === "ValidationError") {
+      const errors = Object.keys(error.errors).reduce((acc, key) => {
+        acc[key] = error.errors[key].message;
+        return acc;
+      }, {});
+
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
+module.exports = { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse, addContentToCourse, addTopicToContent };
