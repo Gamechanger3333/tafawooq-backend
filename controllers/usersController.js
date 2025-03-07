@@ -202,37 +202,23 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    console.log("req body", req);
     const userId = req.params.id;
-    console.log(userId);
-    console.log(req.user.role)
 
     // 1. Ensure that the user has permission to delete (admin or self-delete)
     if (!(req.user && (req.user.role === "admin" || req.user._id.toString() === userId))) {
       return res.status(403).json({ message: "Unauthorized access. You can only delete your own account or require admin privileges." });
     }
 
-    // 2. Check if the user is already inactive (soft delete)
+    // 2. Check if the user exists
     const existingUser = await Users.findById(userId);
     if (!existingUser) {
       return res.status(404).json({ message: "User not found." });
     }
 
-    if (!existingUser.is_active) {
-      return res.status(400).json({ message: "User is already deleted or inactive." });
-    }
+    // 3. Perform actual deletion 
+    const deletedUser = await Users.findByIdAndDelete(userId);
 
-    // 3. Proceed with deactivating the user (soft delete)
-    const user = await Users.findByIdAndUpdate(
-      userId
-    );
-
-    // 4. Handle user not found after checking
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    // 5. Return success message
+    // 4. Return success message
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
