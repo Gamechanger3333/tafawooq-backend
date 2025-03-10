@@ -20,6 +20,7 @@ const bookingRoutes = require('./routes/bookingsRoutes');
 const paymentRoutes = require('./routes/paymentsRoutes');
 const sessionRoutes = require('./routes/sessionsRoutes');
 const assessmentRoutes = require('./routes/assessRoutes');
+const stripeRoutes = require('./routes/stripeRoutes');
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/bookings', bookingRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/assessments', assessmentRoutes);
+app.use("/stripe", stripeRoutes);
 
 const server = http.createServer(app);
 
