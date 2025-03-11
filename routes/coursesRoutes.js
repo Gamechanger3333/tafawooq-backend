@@ -5,8 +5,8 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const authorize = require('../middlewares/authorize');
 
 router.post("/", authMiddleware, authorize('tutor', 'admin'), courseController.createCourse);
-router.get("/", authMiddleware, authorize('tutor', 'admin'), courseController.getAllCourses);
-router.get("/:id", authMiddleware, authorize('tutor', 'admin'), courseController.getCourseById);
+router.get("/", authMiddleware, courseController.getAllCourses);
+router.get("/:id", authMiddleware, courseController.getCourseById);
 router.put("/:id", authMiddleware, authorize('tutor', 'admin'), courseController.updateCourse);
 router.delete("/:id", authMiddleware, authorize('tutor', 'admin'), courseController.deleteCourse);
 router.post("/:courseId/content", authMiddleware, authorize('tutor', 'admin'), courseController.addContentToCourse);

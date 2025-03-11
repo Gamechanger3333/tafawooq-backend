@@ -14,7 +14,7 @@ router.get("/trackpayment/:id", auth, authorize('admin'), stripeController.track
 router.post("/cancelsubscription/:id", auth, authorize('admin'), stripeController.cancelSubscription);
 
 // Routes for Students
-router.post("/AddCardInfo", auth, authorize('student'), stripeController.AddCardInfo);
+router.post("/AddCardInfo", auth, stripeController.AddCardInfo);
 router.post("/removeCard", auth, authorize('student'), stripeController.RemoveCard);
 router.post("/credit", auth, authorize('student'), stripeController.Checkout);
 router.post("/subscriptiondetail", auth, authorize('student'), stripeController.subscriptionDetail);

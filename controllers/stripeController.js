@@ -259,6 +259,10 @@ const Checkout = async (req, res) => {
       payment_method: primaryCard.paymentMethodId,
       description,
       confirm: true,
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: "never"
+      },
       metadata: {
         userId: userId.toString()
       }
@@ -368,14 +372,15 @@ const userSubscription = async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: `${process.env.websiteLink}/paymentsuccess?userId=${userId}&courseId=${courseId}`,
-      cancel_url: `${process.env.websiteLink}/paymenterror`,
+      success_url: `http://localhost:3000/paymentsuccess?userId=${userId}&courseId=${courseId}`,
+      cancel_url: `http://localhost:3000/paymenterror`,
       metadata: {
         userId: userId.toString(),
         courseId: courseId.toString()
       }
     });
 
+    console.log("Stripe Checkout Session Created:", session);
     return res.json({ sessionId: session.id });
 
   } catch (err) {
