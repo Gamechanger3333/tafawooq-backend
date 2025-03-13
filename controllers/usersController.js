@@ -1,6 +1,7 @@
 const Users = require("../models/usersModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { uploadFileToCloudinary } = require ("../utils/Cloudinary.js");
 
 const registerUser = async (req, res) => {
   try {
@@ -88,13 +89,20 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    // 4. Log for debugging (ONLY in development)
+    console.log("User found:", user.email, "Auth provider:", user.auth_provider);
+    console.log("Stored password hash:", user.password_hash.substring(0, 15) + "...");
+    console.log("Attempting to compare password of length:", password.length);
+
     // 5. Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    
+    // 6. Log password comparison result (ONLY in development)
+    console.log("Password comparison result:", isValidPassword);
+    
     if (!isValidPassword) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
-
-    await user.save();
 
     // 7. Generate JWT token
     const token = jwt.sign(
@@ -226,4 +234,36 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser };
+const changeProfilePic = async (req, res) => {
+  try {
+    const filePath = req.file?.path;
+
+    // 1. Validate file upload
+    if (!filePath) {
+      return res.status(400).json({ message: "Please upload a file." });
+    }
+
+    // 3. Find the user
+    const user = await Users.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 4. Upload file to Cloudinary
+    const uploadedFile = await uploadFileToCloudinary(filePath);
+    if (!uploadedFile?.secure_url) {
+      return res.status(500).json({ message: "Error uploading file to Cloudinary." });
+    }
+
+    // 5. Update user profile picture
+    await user.updateOne({ $set: { profile_pic: uploadedFile.secure_url } });
+
+    // 6. Return success message
+    res.status(200).json({ message: "Profile picture updated successfully", user });
+  } catch (error) {
+    console.error("Error updating profile picture:", error);
+    res.status(500).json({ message: "Internal server error. Please try again later." });
+  }
+};
+
+module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic };

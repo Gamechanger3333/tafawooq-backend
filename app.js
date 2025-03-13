@@ -63,8 +63,11 @@ const server = http.createServer(app);
 
 app.all("*", (req, res) => {
     const message = `Can't find ${req.originalUrl} on this server!`;
-    logger.warn(message);
-    throw new ApiError(404, message);
+    console.log(message);
+    res.status(404).json({
+        status: "fail",
+        message: message,
+    });
 });
 
 module.exports = { app, server };
