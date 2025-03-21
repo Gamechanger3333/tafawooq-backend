@@ -8,6 +8,16 @@ const courseSchema = new mongoose.Schema({
     ref: "Users",
     required: [true, "User ID is required"],
   },
+  country_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Countries",
+    required: [true, "Country is required"],
+  },
+  education_level: {
+    type: String,
+    required: [true, "Education level is required"],
+    enum: ['PRIMARY', 'SECONDARY', 'HIGHER', 'PROFESSIONAL']
+  },
   image: {
     type: String,
     required: [true, "Image URL is required"],

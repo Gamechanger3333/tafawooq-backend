@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const programSchema = new mongoose.Schema({
   country_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Country',
+    ref: 'Countries',
     required: true
   },
   name: {

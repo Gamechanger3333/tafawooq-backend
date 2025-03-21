@@ -1,10 +1,11 @@
 const Courses = require("../models/coursesModel");
+const Countries = require("../models/countriesModel"); // Assuming this is your country model
 
 const createCourse = async (req, res) => {
   try {
-    console.log(`[CREATE COURSE] Incoming request from user: ${req.user._id} - ${req.user.name}`);
+    console.log(`[CREATE COURSE] Incoming request from user: ${req.user._id}`);
 
-    // Ensure user is authenticated (redundant check for safety)
+    // Ensure user is authenticated
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -12,19 +13,64 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // Create a new course instance, linking it to the authenticated user
+    // Add this code here - beginning of new code
+    if (!req.body.country_id && req.user.country_id) {
+      req.body.country_id = req.user.country_id;
+    } else if (!req.body.country_id && !req.user.country_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Country is required. Please update your profile with a country or specify a country for this course."
+      });
+    }
+    // End of new code
+
+    // Validate country exists (keep your existing validation)
+    if (!req.body.country_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Country is required",
+      });
+    }
+
+    const countryExists = await Countries.findById(req.body.country_id);
+    if (!countryExists) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid country specified",
+      });
+    }
+
+    // Validate education level
+    if (!req.body.education_level) {
+      return res.status(400).json({
+        success: false,
+        message: "Education level is required",
+      });
+    }
+
+    const validEducationLevels = ['PRIMARY', 'SECONDARY', 'HIGHER', 'PROFESSIONAL'];
+    if (!validEducationLevels.includes(req.body.education_level)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid education level. Must be one of: PRIMARY, SECONDARY, HIGHER, PROFESSIONAL",
+      });
+    }
+
+    console.log("BEFORE SAVE - req.body.country_id:", req.body.country_id);
+    console.log("BEFORE SAVE - req.body.education_level:", req.body.education_level);
+    
+    // Log the course object right after creation
     const course = new Courses({
       ...req.body,
       user_id: req.user._id
     });
-
-    // Validate before saving
+    
+    console.log("AFTER CREATION - course.country_id:", course);
+    
+    // Then validate and save
     await course.validate();
-
-    // Save the course to the database
+    
     await course.save();
-
-    console.log(`[CREATE COURSE] Course created successfully: ${course._id}`);
 
     res.status(201).json({
       success: true,
@@ -58,8 +104,59 @@ const createCourse = async (req, res) => {
 
 const getAllCourses = async (req, res) => {
   try {
-    const courses = await Courses.find().populate('user_id');
+    // Extract filter parameters from query string
+    const { country_id, education_level } = req.query;
+
+    // Build filter object based on provided parameters
+    const filter = {};
+
+    if (country_id) {
+      filter.country_id = country_id;
+    }
+
+    if (education_level) {
+      filter.education_level = education_level;
+    }
+
+    // Apply filters to query
+    const courses = await Courses.find(filter)
+      .populate('user_id')
+      .populate('country_id');
+
     res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getUserSpecificCourses = async (req, res) => {
+  try {
+    // Check if user has a country_id
+    if (!req.user.country_id) {
+      // Instead of returning an error, return default courses
+      const defaultCourses = await Courses.find()
+        .sort({ created_at: -1 })
+        .limit(10)
+        .populate('user_id')
+        .populate('country_id');
+
+      return res.json({
+        success: true,
+        message: "Showing default courses. Set your country in profile settings to see location-specific courses.",
+        isDefault: true,
+        data: defaultCourses
+      });
+    }
+
+    const courses = await Courses.find({ country_id: req.user.country_id })
+      .populate('user_id')
+      .populate('country_id');
+
+    res.json({
+      success: true,
+      isDefault: false,
+      data: courses
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -68,7 +165,8 @@ const getAllCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
   try {
     const course = await Courses.findById(req.params.id)
-      .populate('user_id'); // 🔥 Removed program_subject_id
+      .populate('user_id')
+      .populate('country_id');
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
@@ -82,15 +180,51 @@ const getCourseById = async (req, res) => {
 
 const updateCourse = async (req, res) => {
   try {
+    // First check if the course exists and belongs to the user
+    const existingCourse = await Courses.findById(req.params.id);
+
+    if (!existingCourse) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // Check if the user is authorized to update this course
+    if (existingCourse.user_id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: You can only update your own courses"
+      });
+    }
+
+    // If updating country, validate it exists
+    if (req.body.country_id) {
+      const countryExists = await Countries.findById(req.body.country_id);
+      if (!countryExists) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid country specified",
+        });
+      }
+    }
+
+    // If updating education level, validate it's valid
+    if (req.body.education_level) {
+      const validEducationLevels = ['PRIMARY', 'SECONDARY', 'HIGHER', 'PROFESSIONAL'];
+      if (!validEducationLevels.includes(req.body.education_level)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid education level. Must be one of: PRIMARY, SECONDARY, HIGHER, PROFESSIONAL",
+        });
+      }
+    }
+
+    // Update the course
     const course = await Courses.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
-    ).populate('user_id');
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
+    )
+      .populate('user_id')
+      .populate('country_id');
 
     res.json(course);
   } catch (error) {
@@ -100,19 +234,116 @@ const updateCourse = async (req, res) => {
 
 const deleteCourse = async (req, res) => {
   try {
-    const course = await Courses.findByIdAndDelete(
-      req.params.id
-    ).populate('user_id');
-    if (!course) {
+    // First check if the course exists and belongs to the user
+    const existingCourse = await Courses.findById(req.params.id);
+
+    if (!existingCourse) {
       return res.status(404).json({ message: "Course not found" });
     }
+
+    // Check if the user is authorized to delete this course
+    if (existingCourse.user_id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: You can only delete your own courses"
+      });
+    }
+
+    const course = await Courses.findByIdAndDelete(req.params.id);
     res.json({ message: "Course deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Add content to a course
+// Get courses by country
+const getCoursesByCountry = async (req, res) => {
+  try {
+    const { countryId } = req.params;
+
+    // Validate country exists
+    const countryExists = await Countries.findById(countryId);
+    if (!countryExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Country not found",
+      });
+    }
+
+    // Find courses for the specified country
+    const courses = await Courses.find({ country_id: countryId })
+      .populate('user_id')
+      .populate('country_id');
+
+    res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get courses by education level
+const getCoursesByEducationLevel = async (req, res) => {
+  try {
+    const { level } = req.params;
+
+    // Validate education level
+    const validEducationLevels = ['PRIMARY', 'SECONDARY', 'HIGHER', 'PROFESSIONAL'];
+    if (!validEducationLevels.includes(level)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid education level. Must be one of: PRIMARY, SECONDARY, HIGHER, PROFESSIONAL",
+      });
+    }
+
+    // Find courses for the specified education level
+    const courses = await Courses.find({ education_level: level })
+      .populate('user_id')
+      .populate('country_id');
+
+    res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get courses by country and education level
+const getCoursesByCountryAndLevel = async (req, res) => {
+  try {
+    const { countryId, level } = req.params;
+
+    // Validate country exists
+    const countryExists = await Countries.findById(countryId);
+    if (!countryExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Country not found",
+      });
+    }
+
+    // Validate education level
+    const validEducationLevels = ['PRIMARY', 'SECONDARY', 'HIGHER', 'PROFESSIONAL'];
+    if (!validEducationLevels.includes(level)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid education level. Must be one of: PRIMARY, SECONDARY, HIGHER, PROFESSIONAL",
+      });
+    }
+
+    // Find courses for the specified country and education level
+    const courses = await Courses.find({
+      country_id: countryId,
+      education_level: level
+    })
+      .populate('user_id')
+      .populate('country_id');
+
+    res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Keep your existing content and topic functions
 const addContentToCourse = async (req, res) => {
   try {
     console.log(`[ADD CONTENT] Incoming request from user: ${req.user._id} - ${req.user.name}`);
@@ -129,7 +360,7 @@ const addContentToCourse = async (req, res) => {
 
     // Find the course
     const course = await Courses.findById(courseId);
-    
+
     if (!course) {
       return res.status(404).json({
         success: false,
@@ -186,7 +417,6 @@ const addContentToCourse = async (req, res) => {
   }
 };
 
-// Add topic to a content
 const addTopicToContent = async (req, res) => {
   try {
     console.log(`[ADD TOPIC] Incoming request from user: ${req.user._id} - ${req.user.name}`);
@@ -203,7 +433,7 @@ const addTopicToContent = async (req, res) => {
 
     // Find the course
     const course = await Courses.findById(courseId);
-    
+
     if (!course) {
       return res.status(404).json({
         success: false,
@@ -221,7 +451,7 @@ const addTopicToContent = async (req, res) => {
 
     // Find the content
     const content = course.courseDetails.content.id(contentId);
-    
+
     if (!content) {
       return res.status(404).json({
         success: false,
@@ -269,4 +499,16 @@ const addTopicToContent = async (req, res) => {
   }
 };
 
-module.exports = { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse, addContentToCourse, addTopicToContent };
+module.exports = {
+  createCourse,
+  getAllCourses,
+  getUserSpecificCourses,
+  getCourseById,
+  updateCourse,
+  deleteCourse,
+  addContentToCourse,
+  addTopicToContent,
+  getCoursesByCountry,
+  getCoursesByEducationLevel,
+  getCoursesByCountryAndLevel
+};

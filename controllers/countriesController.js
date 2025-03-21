@@ -12,7 +12,7 @@ const createCountry = async (req, res) => {
 
 const getAllCountries = async (req, res) => {
   try {
-    const countries = await Countries.find({ is_active: true });
+    const countries = await Countries.find();
     res.json(countries);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -49,10 +49,8 @@ const updateCountry = async (req, res) => {
 
 const deleteCountry = async (req, res) => {
   try {
-    const country = await Countries.findByIdAndUpdate(
-      req.params.id,
-      { is_active: false },
-      { new: true }
+    const country = await Countries.findByIdAndDelete(
+      req.params.id
     );
     if (!country) {
       return res.status(404).json({ message: 'Country not found' });
