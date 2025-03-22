@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Users = require("../models/usersModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -5,11 +6,17 @@ const { uploadFileToCloudinary } = require ("../utils/Cloudinary.js");
 
 const registerUser = async (req, res) => {
   try {
-    const { email, password, ...userData } = req.body;
+    const { email, password, country_id, ...userData } = req.body;
 
-    // 1. Check if email and password are provided
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required." });
+    // 1. Check if email, password and country_id are provided
+    if (!email || !password || !country_id) {
+      return res.status(400).json({ message: "Email, password and country_id are required." });
+    }
+
+    // Validate country_id exists in database
+    const countryExists = await mongoose.model('Countries').findById(country_id);
+    if (!countryExists) {
+      return res.status(400).json({ message: "Invalid country selected." });
     }
 
     // 2. Validate email format
@@ -40,6 +47,7 @@ const registerUser = async (req, res) => {
       ...userData,
       email,
       password_hash: hashedPassword,
+      country_id
     });
 
     await user.save();
@@ -156,7 +164,7 @@ const getUserById = async (req, res) => {
     }
 
     // 2. Fetch user by ID
-    const user = await Users.findById(userId).select('-password_hash');
+    const user = await Users.findById(userId).select('-password_hash').populate('country_id');
 
     // 3. Handle user not found
     if (!user) {

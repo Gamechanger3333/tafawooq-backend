@@ -65,7 +65,7 @@ const userSchema = new mongoose.Schema({
   country_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Countries',
-    required: false
+    required: true 
   },
   created_at: {
     type: Date,
