@@ -164,7 +164,7 @@ const getUserById = async (req, res) => {
     }
 
     // 2. Fetch user by ID
-    const user = await Users.findById(userId).select('-password_hash').populate('country_id');
+    const user = await Users.findById(userId).select('-password_hash').populate('country_id').populate('purchasedCourses');
 
     // 3. Handle user not found
     if (!user) {
