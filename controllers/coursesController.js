@@ -1,5 +1,6 @@
 const Courses = require("../models/coursesModel");
-const Countries = require("../models/countriesModel"); // Assuming this is your country model
+const Countries = require("../models/countriesModel");
+const { uploadFileToCloudinary } = require('../utils/Cloudinary');
 
 const createCourse = async (req, res) => {
   try {
@@ -419,11 +420,20 @@ const addContentToCourse = async (req, res) => {
 
 const addTopicToContent = async (req, res) => {
   try {
-    console.log(`[ADD TOPIC] Incoming request from user: ${req.user._id} - ${req.user.name}`);
+    console.log(`[ADD TOPIC] Incoming request from user: ${req.user._id}`);
 
     const { courseId, contentId } = req.params;
     const { title } = req.body;
 
+    // Check if video file exists
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Video is required"
+      });
+    }
+
+    // Validate inputs
     if (!title) {
       return res.status(400).json({
         success: false,
@@ -459,9 +469,23 @@ const addTopicToContent = async (req, res) => {
       });
     }
 
-    // Create new topic
+    // Upload video to Cloudinary
+    const uploadedVideo = await uploadFileToCloudinary(req.file.path, {
+      resource_type: 'video',
+      folder: 'course_videos'
+    });
+
+    if (!uploadedVideo) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload video"
+      });
+    }
+
+    // Create new topic with video URL
     const newTopic = {
-      title: title
+      title: title,
+      video: uploadedVideo.secure_url
     };
 
     // Add topic to the content
