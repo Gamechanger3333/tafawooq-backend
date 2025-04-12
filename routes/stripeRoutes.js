@@ -4,6 +4,9 @@ const stripeController = require("../controllers/stripeController");
 const auth = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
+// Route to get students by course - admin only
+router.get("/students-by-course/:courseId", auth, authorize('tutor'), stripeController.getStudentsByCourse);
+
 // Routes for Admins - restricted to admin role only
 router.post("/create-account", auth, authorize('admin'), stripeController.createSellerAccount);
 router.get("/generate-oauth-link/:userId", auth, authorize('admin'), stripeController.generateOAuthLink);

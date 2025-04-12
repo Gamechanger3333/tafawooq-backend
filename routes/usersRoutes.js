@@ -10,6 +10,7 @@ router.post("/login", userController.loginUser);
 
 // Protected routes (require authentication)
 router.get("/", auth, authorize('admin'), userController.getAllUsers);
+router.get("/tutors-from-courses", auth, userController.getTutorIdsFromPurchasedCourses);
 router.get("/:id", auth, userController.getUserById);
 router.put("/:id", auth, userController.updateUser);
 router.delete("/:id", auth, userController.deleteUser);

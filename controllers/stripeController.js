@@ -773,6 +773,52 @@ const cancelSubscription = async (req, res) => {
   }
 };
 
+const getStudentsByCourse = async (req, res) => {
+  const { courseId } = req.params;
+  
+  if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    return res.status(400).json({ success: false, message: "Invalid course ID" });
+  }
+  
+  try {
+    // Find all successful payments for this course
+    const payments = await stripemodel.find({
+      courseId: courseId,
+      status: 'succeeded'
+    }).populate('userId', 'email first_name last_name profile_pic');
+    
+    if (!payments || payments.length === 0) {
+      return res.status(200).json({ 
+        success: true, 
+        message: "No students found for this course", 
+        data: [] 
+      });
+    }
+    
+    // Map the results to return student information
+    const students = payments.map(payment => ({
+      _id: payment.userId._id,
+      first_name: payment.userId.first_name,
+      last_name: payment.userId.last_name,
+      email: payment.userId.email,
+      profile_pic: payment.userId.profile_pic,
+    }));
+    
+    res.status(200).json({
+      success: true,
+      message: `Found ${students.length} students who paid for this course`,
+      data: students
+    });
+  } catch (error) {
+    console.error("Error retrieving students by course:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to retrieve students", 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   createSellerAccount,
   generateOAuthLink,
@@ -787,5 +833,6 @@ module.exports = {
   allTransections,
   trackPayment,
   cancelSubscription,
-  subscriptionDetail
+  subscriptionDetail,
+  getStudentsByCourse
 };

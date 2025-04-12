@@ -274,4 +274,63 @@ const changeProfilePic = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic };
+const getTutorIdsFromPurchasedCourses = async (req, res) => {
+  try {
+    // 1. Get the authenticated user's ID
+    const userId = req.user._id;
+
+    // 2. Find the user and populate the purchased courses with tutor details
+    const user = await Users.findById(userId)
+      .populate({
+        path: 'purchasedCourses',
+        select: 'user_id courseTitle price',
+        // Nested populate to get tutor details
+        populate: {
+          path: 'user_id',
+          select: 'first_name last_name email profile_pic' // Select only necessary fields
+        }
+      });
+
+    // 3. Handle user not found
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found." 
+      });
+    }
+
+    // 4. Extract tutor information from purchased courses
+    const tutors = user.purchasedCourses.map(course => ({
+      _id: course.user_id._id,
+      first_name: course.user_id.first_name,
+      last_name: course.user_id.last_name,
+      email: course.user_id.email,
+      profile_pic: course.user_id.profile_pic,
+    }));
+
+    // Check if we found any tutors
+    if (!tutors || tutors.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No tutors found for your purchased courses",
+        data: []
+      });
+    }
+
+    // 5. Return the list of tutors with their details in the same format as getStudentsByCourse
+    res.status(200).json({
+      success: true,
+      message: `Found ${tutors.length} tutors from your purchased courses`,
+      data: tutors
+    });
+  } catch (error) {
+    console.error("Error fetching tutor IDs:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to retrieve tutors", 
+      error: error.message 
+    });
+  }
+};
+
+module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses };

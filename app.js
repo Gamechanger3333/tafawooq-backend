@@ -3,6 +3,8 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const http = require('http');
+const socketIO = require("socket.io");
+const socketSetup = require("./utils/socketSetup");
 
 /////// Routes ///////
 const countriesRoutes = require('./routes/countriesRoutes');
@@ -21,8 +23,26 @@ const paymentRoutes = require('./routes/paymentsRoutes');
 const sessionRoutes = require('./routes/sessionsRoutes');
 const assessmentRoutes = require('./routes/assessRoutes');
 const stripeRoutes = require('./routes/stripeRoutes');
+const messageRoutes = require('./routes/messagesRoutes');
+
+console.log("Starting application...");
 
 const app = express();
+const server = http.createServer(app);
+
+// Setup Socket.io
+console.log("Setting up Socket.IO");
+const io = socketIO(server, {
+  cors: {
+    origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+console.log("Initializing socket handlers");
+// Initialize socket handlers
+socketSetup(io);
 
 const corsOptions = {
     origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
@@ -31,6 +51,7 @@ const corsOptions = {
     credentials: true,
 };
 
+console.log("Setting up middleware");
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(cookieParser());
@@ -41,6 +62,7 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
+console.log("Setting up routes");
 // Routes
 app.use('/countries', countriesRoutes);
 app.use('/programs', programsRoutes);
@@ -58,8 +80,7 @@ app.use('/payments', paymentRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/assessments', assessmentRoutes);
 app.use("/stripe", stripeRoutes);
-
-const server = http.createServer(app);
+app.use("/messages", messageRoutes);
 
 app.all("*", (req, res) => {
     const message = `Can't find ${req.originalUrl} on this server!`;
@@ -70,4 +91,5 @@ app.all("*", (req, res) => {
     });
 });
 
-module.exports = { app, server };
+console.log("Application setup complete");
+module.exports = { app, server, io };
