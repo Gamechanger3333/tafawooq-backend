@@ -24,6 +24,7 @@ const sessionRoutes = require('./routes/sessionsRoutes');
 const assessmentRoutes = require('./routes/assessRoutes');
 const stripeRoutes = require('./routes/stripeRoutes');
 const messageRoutes = require('./routes/messagesRoutes');
+const assignmentRoutes = require('./routes/assignmentRoutes');
 
 console.log("Starting application...");
 
@@ -81,6 +82,7 @@ app.use('/sessions', sessionRoutes);
 app.use('/assessments', assessmentRoutes);
 app.use("/stripe", stripeRoutes);
 app.use("/messages", messageRoutes);
+app.use('/assignments', assignmentRoutes);
 
 app.all("*", (req, res) => {
     const message = `Can't find ${req.originalUrl} on this server!`;
