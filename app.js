@@ -3,8 +3,6 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const http = require('http');
-const socketIO = require("socket.io");
-const socketSetup = require("./utils/socketSetup");
 
 /////// Routes ///////
 const countriesRoutes = require('./routes/countriesRoutes');
@@ -30,20 +28,6 @@ console.log("Starting application...");
 
 const app = express();
 const server = http.createServer(app);
-
-// Setup Socket.io
-console.log("Setting up Socket.IO");
-const io = socketIO(server, {
-  cors: {
-    origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
-
-console.log("Initializing socket handlers");
-// Initialize socket handlers
-socketSetup(io);
 
 const corsOptions = {
     origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
@@ -94,4 +78,4 @@ app.all("*", (req, res) => {
 });
 
 console.log("Application setup complete");
-module.exports = { app, server, io };
+module.exports = { app, server };
