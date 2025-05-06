@@ -11,9 +11,12 @@ router.post("/login", userController.loginUser);
 // Protected routes (require authentication)
 router.get("/", auth, authorize('admin'), userController.getAllUsers);
 router.get("/tutors-from-courses", auth, userController.getTutorIdsFromPurchasedCourses);
+router.get("/search", auth, userController.searchUsers);
 router.get("/:id", auth, userController.getUserById);
 router.put("/:id", auth, userController.updateUser);
 router.delete("/:id", auth, userController.deleteUser);
-router.patch("/change-profile-pic", auth, uploadOnMulter.single("profile_pic"), userController.changeProfilePic );
+router.post("/change-profile-pic", auth, uploadOnMulter.single("profile_pic"), userController.changeProfilePic);
+router.patch("/change-profile-pic", auth, uploadOnMulter.single("profile_pic"), userController.changeProfilePic);
+router.patch('/:id/password', auth, userController.updatePassword);
 
 module.exports = router;
