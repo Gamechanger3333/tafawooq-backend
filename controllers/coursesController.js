@@ -1,6 +1,7 @@
 const Courses = require("../models/coursesModel");
 const Countries = require("../models/countriesModel");
 const { uploadFileToCloudinary } = require('../utils/Cloudinary');
+const { default: mongoose } = require("mongoose");
 
 const createCourse = async (req, res) => {
   try {
@@ -521,7 +522,55 @@ const addTopicToContent = async (req, res) => {
       error: error.message
     });
   }
+  
 };
+
+
+// Add this function to your coursesController.js file
+
+const getTutorCourses = async (req, res) => {
+  try {
+    const { tutorId } = req.params;
+    
+    // Validate that tutorId is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(tutorId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tutor ID format"
+      });
+    }
+
+    // Find all courses created by this tutor
+    const tutorCourses = await Courses.find({ user_id: tutorId })
+      // .populate('user_id')
+      // .populate('country_id');
+
+    // Check if any courses were found
+    if (tutorCourses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No courses found for this tutor",
+        data: []
+      });
+    }
+
+    // Return the courses
+    res.status(200).json({
+      success: true,
+      count: tutorCourses.length,
+      data: tutorCourses
+    });
+  } catch (error) {
+    console.error(`[GET TUTOR COURSES] Error:`, error.message);
+    
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
 
 module.exports = {
   createCourse,
@@ -534,5 +583,6 @@ module.exports = {
   addTopicToContent,
   getCoursesByCountry,
   getCoursesByEducationLevel,
-  getCoursesByCountryAndLevel
+  getCoursesByCountryAndLevel,
+  getTutorCourses
 };

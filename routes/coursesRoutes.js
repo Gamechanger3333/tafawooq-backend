@@ -18,5 +18,7 @@ router.get("/user/courses", authMiddleware, courseController.getUserSpecificCour
 router.get("/country/:countryId", authMiddleware, courseController.getCoursesByCountry);
 router.get("/education/:level", authMiddleware, courseController.getCoursesByEducationLevel);
 router.get("/country/:countryId/education/:level", authMiddleware, courseController.getCoursesByCountryAndLevel);
+router.get('/tutor/:tutorId',authMiddleware,authorize('tutor'), courseController.getTutorCourses);
+
 
 module.exports = router;
