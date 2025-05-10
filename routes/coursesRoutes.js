@@ -16,6 +16,7 @@ router.post("/:courseId/content/:contentId/topic", authMiddleware, authorize('tu
 // New routes
 router.get("/user/courses", authMiddleware, courseController.getUserSpecificCourses);
 router.get("/country/:countryId", authMiddleware, courseController.getCoursesByCountry);
+router.get('/purchasedCourses/:studentId',authMiddleware,authorize('student'), courseController.getStudentPurchasedCourses);
 router.get("/education/:level", authMiddleware, courseController.getCoursesByEducationLevel);
 router.get("/country/:countryId/education/:level", authMiddleware, courseController.getCoursesByCountryAndLevel);
 router.get('/tutor/:tutorId',authMiddleware,authorize('tutor'), courseController.getTutorCourses);

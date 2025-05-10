@@ -2,6 +2,7 @@ const Courses = require("../models/coursesModel");
 const Countries = require("../models/countriesModel");
 const { uploadFileToCloudinary } = require('../utils/Cloudinary');
 const { default: mongoose } = require("mongoose");
+const Users = require("../models/usersModel");
 
 const createCourse = async (req, res) => {
   try {
@@ -60,18 +61,18 @@ const createCourse = async (req, res) => {
 
     console.log("BEFORE SAVE - req.body.country_id:", req.body.country_id);
     console.log("BEFORE SAVE - req.body.education_level:", req.body.education_level);
-    
+
     // Log the course object right after creation
     const course = new Courses({
       ...req.body,
       user_id: req.user._id
     });
-    
+
     console.log("AFTER CREATION - course.country_id:", course);
-    
+
     // Then validate and save
     await course.validate();
-    
+
     await course.save();
 
     res.status(201).json({
@@ -522,7 +523,7 @@ const addTopicToContent = async (req, res) => {
       error: error.message
     });
   }
-  
+
 };
 
 
@@ -531,7 +532,7 @@ const addTopicToContent = async (req, res) => {
 const getTutorCourses = async (req, res) => {
   try {
     const { tutorId } = req.params;
-    
+
     // Validate that tutorId is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(tutorId)) {
       return res.status(400).json({
@@ -542,8 +543,8 @@ const getTutorCourses = async (req, res) => {
 
     // Find all courses created by this tutor
     const tutorCourses = await Courses.find({ user_id: tutorId })
-      // .populate('user_id')
-      // .populate('country_id');
+    // .populate('user_id')
+    // .populate('country_id');
 
     // Check if any courses were found
     if (tutorCourses.length === 0) {
@@ -562,11 +563,65 @@ const getTutorCourses = async (req, res) => {
     });
   } catch (error) {
     console.error(`[GET TUTOR COURSES] Error:`, error.message);
-    
+
     res.status(500).json({
       success: false,
       message: "Something went wrong",
       error: error.message
+    });
+  }
+};
+
+const getStudentPurchasedCourses = async (req, res) => {
+  try {
+    console.log(`[GET PURCHASED COURSES] Incoming request from user: ${req.user._id}`);
+
+    // Ensure user is authenticated
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: User authentication required",
+      });
+    }
+
+    // Check if user role is student
+    if (req.user.role !== 'student' && req.user.role !== 'parent') {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Only students and parents can access purchased courses",
+      });
+    }
+
+    // Find the student with populated purchased courses
+    const student = await Users.findById(req.user._id)
+      .populate({
+        path: 'purchasedCourses',
+        populate: [
+          { path: '_id', select: 'first_name last_name profile_pic' },
+          { path: 'country_id' }
+        ]
+      });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    // Return the purchased courses
+    res.status(200).json({
+      success: true,
+      count: student.purchasedCourses.length,
+      data: student.purchasedCourses,
+    });
+  } catch (error) {
+    console.error(`[GET PURCHASED COURSES] Error:`, error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message,
     });
   }
 };
@@ -584,5 +639,6 @@ module.exports = {
   getCoursesByCountry,
   getCoursesByEducationLevel,
   getCoursesByCountryAndLevel,
-  getTutorCourses
+  getTutorCourses,
+  getStudentPurchasedCourses
 };

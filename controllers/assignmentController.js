@@ -1,6 +1,7 @@
 const Assignment = require("../models/assignmentModel");
 const Course = require("../models/coursesModel");
 const fs = require("fs");
+const path = require("path");
 
 // Helper function to handle errors
 const handleError = (error, res, message = "Server error") => {
@@ -21,7 +22,7 @@ const isValidObjectId = (id) => {
 exports.createAssignment = async (req, res) => {
   try {
     const { course_id, title, description, dueDate, badgeText } = req.body;
-    
+
     // Basic validation
     if (!course_id || !title || !dueDate) {
       return res.status(400).json({
@@ -29,7 +30,7 @@ exports.createAssignment = async (req, res) => {
         message: "course_id, title, and dueDate are required fields"
       });
     }
-    
+
     // Validate course_id
     if (!isValidObjectId(course_id)) {
       return res.status(400).json({
@@ -37,7 +38,7 @@ exports.createAssignment = async (req, res) => {
         message: "Invalid course ID format"
       });
     }
-    
+
     // Check if course exists
     const course = await Course.findById(course_id);
     if (!course) {
@@ -46,7 +47,7 @@ exports.createAssignment = async (req, res) => {
         message: "Course not found"
       });
     }
-    
+
     // Verify the user is the owner of the course
     if (course.user_id.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
@@ -67,12 +68,13 @@ exports.createAssignment = async (req, res) => {
       if (req.files.attachment && req.files.attachment[0]) {
         attachment = req.files.attachment[0].path;
       }
-      
+
       // Handle document file if present
       if (req.files.document && req.files.document[0]) {
-        document = req.files.document[0].path;
-        documentName = req.files.document[0].originalname;
-        documentType = req.files.document[0].mimetype;
+        const documentFile = req.files.document[0];
+        document = documentFile.path;
+        documentName = documentFile.originalname;
+        documentType = documentFile.mimetype;
       }
     }
 
@@ -92,7 +94,7 @@ exports.createAssignment = async (req, res) => {
 
     // Save assignment to database
     const savedAssignment = await newAssignment.save();
-    
+
     res.status(201).json({
       success: true,
       message: "Assignment created successfully",
@@ -107,7 +109,7 @@ exports.createAssignment = async (req, res) => {
 exports.getAssignmentsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    
+
     // Validate courseId
     if (!isValidObjectId(courseId)) {
       return res.status(400).json({
@@ -115,7 +117,7 @@ exports.getAssignmentsByCourse = async (req, res) => {
         message: "Invalid course ID format"
       });
     }
-    
+
     // Check if course exists
     const course = await Course.findById(courseId);
     if (!course) {
@@ -124,11 +126,11 @@ exports.getAssignmentsByCourse = async (req, res) => {
         message: "Course not found"
       });
     }
-    
+
     // Fetch assignments
     const assignments = await Assignment.find({ course_id: courseId })
       .sort({ created_at: -1 });
-      
+
     res.status(200).json({
       success: true,
       count: assignments.length,
@@ -143,7 +145,7 @@ exports.getAssignmentsByCourse = async (req, res) => {
 exports.getAssignmentById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate assignment ID
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -151,17 +153,17 @@ exports.getAssignmentById = async (req, res) => {
         message: "Invalid assignment ID format"
       });
     }
-    
+
     // Find assignment
     const assignment = await Assignment.findById(id);
-    
+
     if (!assignment) {
       return res.status(404).json({
         success: false,
         message: "Assignment not found"
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: assignment
@@ -171,63 +173,177 @@ exports.getAssignmentById = async (req, res) => {
   }
 };
 
-// Download assignment document
+
+//downloadAssignmentDocument function
 exports.downloadAssignmentDocument = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate assignment ID
     if (!isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid assignment ID format"
+        message: 'Invalid assignment ID format'
       });
     }
-    
+
     // Find assignment
     const assignment = await Assignment.findById(id);
-    
+
     if (!assignment) {
       return res.status(404).json({
         success: false,
-        message: "Assignment not found"
+        message: 'Assignment not found'
       });
     }
-    
+
     // Check if document exists
     if (!assignment.document) {
       return res.status(404).json({
         success: false,
-        message: "No document attached to this assignment"
+        message: 'No document attached to this assignment'
       });
     }
-    
-    // Check if file exists
-    if (!fs.existsSync(assignment.document)) {
-      return res.status(404).json({
-        success: false,
-        message: "Document file not found"
-      });
+
+    // Log for debugging
+    console.log(`Document path from DB: ${assignment.document}`);
+    console.log(`Document name from DB: ${assignment.documentName}`);
+    console.log(`Document type from DB: ${assignment.documentType}`);
+
+    // Get the document filename - ensure we get just the filename without path
+    const documentFilename = path.basename(assignment.document);
+
+    // First try the exact path from the database
+    let filePath = assignment.document;
+
+    try {
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      console.log(`Found file at original path: ${filePath}`);
+    } catch (err) {
+      console.log(`File not found at original path: ${filePath}`);
+
+      // If the exact path failed, try to find the file in the tmp directory
+      const tmpDir = path.resolve(process.cwd(), 'tmp');
+
+      try {
+        const files = await fs.promises.readdir(tmpDir);
+        console.log(`Files in tmp directory: ${files.join(', ')}`);
+
+        // First, try to match the exact filename from the assignment.document path
+        let matchingFile = files.find(file => file === documentFilename);
+
+        // If not found and the original filename has a timestamp, try looking for files with same original name part
+        if (!matchingFile && documentFilename.includes('-')) {
+          const originalFilePart = documentFilename.split('-').slice(1).join('-');
+          console.log(`Looking for files containing: ${originalFilePart}`);
+
+          // Look for most recent file that contains the original filename
+          const matchingFiles = files.filter(file => file.includes(originalFilePart));
+
+          if (matchingFiles.length > 0) {
+            // Sort by creation time (newest first) to get the most recent upload
+            const fileStats = await Promise.all(
+              matchingFiles.map(async file => {
+                const fullPath = path.join(tmpDir, file);
+                const stats = await fs.promises.stat(fullPath);
+                return { file, stats };
+              })
+            );
+
+            fileStats.sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+            matchingFile = fileStats[0].file;
+          }
+        }
+
+        if (matchingFile) {
+          filePath = path.join(tmpDir, matchingFile);
+          console.log(`Found file in tmp directory: ${filePath}`);
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: 'Document file not found on server'
+          });
+        }
+      } catch (dirError) {
+        console.error(`Error reading tmp directory: ${dirError.message}`);
+        return res.status(404).json({
+          success: false,
+          message: 'Document file not found on server'
+        });
+      }
     }
-    
+
+    // Use stored document name if available, otherwise extract from path
+    let fileName = assignment.documentName;
+
+    // If documentName is not available, extract the original name from the path
+    if (!fileName) {
+      // If filename has a timestamp prefix (like "1746619260608-4 Compartments.pdf")
+      if (documentFilename.includes('-')) {
+        fileName = documentFilename.split('-').slice(1).join('-');
+      } else {
+        fileName = documentFilename;
+      }
+    }
+
+    // Ensure we have a valid content type
+    let contentType = assignment.documentType;
+
+    // If documentType is not available or invalid, determine from file extension
+    if (!contentType || contentType === 'application/octet-stream') {
+      contentType = mime.lookup(fileName) || mime.lookup(filePath) || 'application/octet-stream';
+    }
+
+    // For PDFs, ensure the content type is correct
+    if (fileName.toLowerCase().endsWith('.pdf')) {
+      contentType = 'application/pdf';
+    }
+
+    // Log file details for debugging
+    console.log(`Sending file: ${filePath}`);
+    console.log(`File name: ${fileName}`);
+    console.log(`Content type: ${contentType}`);
+
     // Set appropriate headers
-    res.setHeader('Content-Type', assignment.documentType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${assignment.documentName || 'document'}"`);
-    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    console.log(`attachment; filename="${fileName}`)
+    // Get file stats
+    const stats = await fs.promises.stat(filePath);
+    res.setHeader('Content-Length', stats.size);
+    // console.log('stats.size', stats)
+
     // Stream the file
-    const fileStream = fs.createReadStream(assignment.document);
+    const fileStream = fs.createReadStream(filePath);
+
+    fileStream.on('error', error => {
+      console.error(`Error streaming file: ${error.message}`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Error streaming file'
+        });
+      }
+    });
+
     fileStream.pipe(res);
   } catch (error) {
-    return handleError(error, res, "Failed to download document");
+    console.error('Document download error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to download document',
+      error: error.message
+    });
   }
-};
+}
+
 
 // Update an assignment
 exports.updateAssignment = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, dueDate, badgeText } = req.body;
-    
+
     // Validate assignment ID
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -235,17 +351,17 @@ exports.updateAssignment = async (req, res) => {
         message: "Invalid assignment ID format"
       });
     }
-    
+
     // Find the assignment
     const assignment = await Assignment.findById(id);
-    
+
     if (!assignment) {
       return res.status(404).json({
         success: false,
         message: "Assignment not found"
       });
     }
-    
+
     // Check if the user is authorized to update this assignment
     if (assignment.created_by.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
@@ -253,7 +369,7 @@ exports.updateAssignment = async (req, res) => {
         message: "You are not authorized to update this assignment"
       });
     }
-    
+
     // Initialize update data
     const updateData = {
       title: title || assignment.title,
@@ -261,7 +377,7 @@ exports.updateAssignment = async (req, res) => {
       dueDate: dueDate || assignment.dueDate,
       badgeText: badgeText ? (Array.isArray(badgeText) ? badgeText : [badgeText]) : assignment.badgeText
     };
-    
+
     // Handle file updates
     if (req.files) {
       // Handle attachment file if present
@@ -272,7 +388,7 @@ exports.updateAssignment = async (req, res) => {
         }
         updateData.attachment = req.files.attachment[0].path;
       }
-      
+
       // Handle document file if present
       if (req.files.document && req.files.document[0]) {
         // Delete old document if exists
@@ -284,14 +400,14 @@ exports.updateAssignment = async (req, res) => {
         updateData.documentType = req.files.document[0].mimetype;
       }
     }
-    
+
     // Update assignment
     const updatedAssignment = await Assignment.findByIdAndUpdate(
       id,
       updateData,
       { new: true, runValidators: true }
     );
-    
+
     res.status(200).json({
       success: true,
       message: "Assignment updated successfully",
@@ -306,7 +422,7 @@ exports.updateAssignment = async (req, res) => {
 exports.deleteAssignment = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate assignment ID
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -314,17 +430,17 @@ exports.deleteAssignment = async (req, res) => {
         message: "Invalid assignment ID format"
       });
     }
-    
+
     // Find the assignment
     const assignment = await Assignment.findById(id);
-    
+
     if (!assignment) {
       return res.status(404).json({
         success: false,
         message: "Assignment not found"
       });
     }
-    
+
     // Check if the user is authorized to delete this assignment
     if (assignment.created_by.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
@@ -332,19 +448,19 @@ exports.deleteAssignment = async (req, res) => {
         message: "You are not authorized to delete this assignment"
       });
     }
-    
+
     // Delete assignment files
     if (assignment.attachment && fs.existsSync(assignment.attachment)) {
       fs.unlinkSync(assignment.attachment);
     }
-    
+
     if (assignment.document && fs.existsSync(assignment.document)) {
       fs.unlinkSync(assignment.document);
     }
-    
+
     // Delete assignment record
     await Assignment.findByIdAndDelete(id);
-    
+
     res.status(200).json({
       success: true,
       message: "Assignment deleted successfully"

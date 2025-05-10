@@ -25,6 +25,7 @@ const corsOptions = {
     origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
     methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
     allowedHeaders: "X-Requested-With, Content-Type, Authorization",
+    exposedHeaders: ['Content-Disposition'],
     credentials: true,
 };
 
