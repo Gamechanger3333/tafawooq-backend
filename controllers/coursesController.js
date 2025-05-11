@@ -543,8 +543,8 @@ const getTutorCourses = async (req, res) => {
 
     // Find all courses created by this tutor
     const tutorCourses = await Courses.find({ user_id: tutorId })
-    // .populate('user_id')
-    // .populate('country_id');
+      .populate('user_id')
+      .populate('country_id');
 
     // Check if any courses were found
     if (tutorCourses.length === 0) {
@@ -627,6 +627,167 @@ const getStudentPurchasedCourses = async (req, res) => {
 };
 
 
+// Now let's implement the controller function for top courses
+const getTopCourses = async (req, res) => {
+  try {
+    console.log(`[GET TOP COURSES] Incoming request from user: ${req.user._id}`);
+
+    // Check if user is authorized (must be admin or tutor)
+    if (req.user.role !== 'admin' && req.user.role !== 'tutor') {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only tutors and admins can access top courses analytics"
+      });
+    }
+
+    // Get filter period from query params (default to 'month')
+    const { period = 'month', metric = 'purchases' } = req.query;
+
+    // Calculate the date for filtering based on the period
+    const currentDate = new Date();
+    let filterDate = new Date();
+
+    switch (period) {
+      case 'last28Days':
+        filterDate.setDate(currentDate.getDate() - 28);
+        break;
+      case 'month':
+        filterDate.setMonth(currentDate.getMonth() - 1);
+        break;
+      case 'year':
+        filterDate.setFullYear(currentDate.getFullYear() - 1);
+        break;
+      default:
+        filterDate.setMonth(currentDate.getMonth() - 1); // Default to last month
+    }
+
+    console.log(`[GET TOP COURSES] Filtering by period: ${period}, from date: ${filterDate.toISOString()}`);
+
+    // For tutors, only show their own courses
+    const matchQuery = req.user.role === 'tutor'
+      ? { user_id: new mongoose.Types.ObjectId(req.user._id) }
+      : {};
+
+    console.log(`[GET TOP COURSES] Match query:`, matchQuery);
+
+    // Sort field based on metric
+    const sortField = metric === 'views' ? 'totalViews' : 'totalPurchases';
+
+    // Aggregation pipeline with proper handling of null/missing fields
+    const topCourses = await Courses.aggregate([
+      // Match by user_id for tutors
+      { $match: matchQuery },
+      // Sort by the appropriate metric
+      { $sort: { [sortField]: -1 } },
+      // Limit to top 5
+      { $limit: 5 },
+      // Lookup to get user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user_id',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      // Lookup to get country details
+      {
+        $lookup: {
+          from: 'countries',
+          localField: 'country_id',
+          foreignField: '_id',
+          as: 'country'
+        }
+      },
+      // Unwind the arrays to get single objects
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$country', preserveNullAndEmptyArrays: true } },
+      // Project only the needed fields
+      {
+        $project: {
+          _id: 1,
+          courseTitle: 1,
+          desc: 1,
+          education_level: 1,
+          price: 1,
+          image: 1,
+          created_at: 1,
+          totalViews: { $ifNull: ['$totalViews', 0] },
+          totalPurchases: { $ifNull: ['$totalPurchases', 0] },
+          'user._id': 1,
+          'user.first_name': 1,
+          'user.last_name': 1,
+          'user.profile_pic': 1,
+          'country._id': 1,
+          'country.name': 1
+        }
+      }
+    ]);
+
+    // Return the results
+    return res.status(200).json({
+      success: true,
+      period,
+      metric,
+      count: topCourses.length,
+      data: topCourses
+    });
+  } catch (error) {
+    console.error(`[GET TOP COURSES] Error:`, error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+};
+
+// Need to implement a function to track course views
+const trackCourseView = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Only track if user is authenticated
+    if (req.user) {
+      const courseId = id;
+      const userId = req.user._id;
+
+      // Use findOneAndUpdate with $addToSet to ensure unique views
+      // The $addToSet operator will only add the element if it doesn't already exist
+      const result = await Courses.findOneAndUpdate(
+        {
+          _id: courseId,
+          // Check if this user's ID is not already in the views array
+          "views.user_id": { $ne: userId }
+        },
+        {
+          // Add the new view entry if the user hasn't viewed before
+          $push: {
+            views: {
+              timestamp: new Date(),
+              user_id: userId
+            }
+          },
+          // Only increment if the update actually happened
+          $inc: { totalViews: 1 }
+        },
+        { new: true }
+      );
+
+      // No need to do anything if result is null (meaning user already viewed)
+    }
+
+    // Continue to the next middleware/controller
+    next();
+  } catch (error) {
+    console.error(`[TRACK VIEW] Error:`, error.message);
+    // Don't block the request if tracking fails
+    next();
+  }
+};
+
+
 module.exports = {
   createCourse,
   getAllCourses,
@@ -640,5 +801,7 @@ module.exports = {
   getCoursesByEducationLevel,
   getCoursesByCountryAndLevel,
   getTutorCourses,
-  getStudentPurchasedCourses
+  getStudentPurchasedCourses,
+  getTopCourses,
+  trackCourseView,
 };

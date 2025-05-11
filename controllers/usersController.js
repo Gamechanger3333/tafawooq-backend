@@ -3,6 +3,7 @@ const Users = require("../models/usersModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { uploadFileToCloudinary } = require("../utils/Cloudinary.js");
+const Courses = require("../models/coursesModel.js");
 
 const registerUser = async (req, res) => {
   try {
@@ -456,4 +457,107 @@ const updatePassword = async (req, res) => {
 };
 
 
-module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses, searchUsers, updatePassword };
+const getTutorStudents = async (req, res) => {
+  try {
+    const tutorId = req.params.tutorId || req.user._id; // Get from params or auth token
+
+    // Check if tutor exists and has role 'tutor'
+    const tutor = await Users.findOne({
+      _id: tutorId,
+      role: 'tutor'
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tutor not found or user is not a tutor'
+      });
+    }
+
+    // Find all courses created by this tutor
+    const tutorCourses = await Courses.find({ user_id: tutorId });
+
+    if (tutorCourses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'No courses found for this tutor'
+      });
+    }
+
+    // Extract course IDs from the tutor's courses
+    const courseIds = tutorCourses.map(course => course._id);
+
+    // Find all students who have purchased any of these courses
+    // We're using aggregate to get more detailed student information
+    const students = await Users.aggregate([
+      {
+        // Match only students who have purchased at least one of the tutor's courses
+        $match: {
+          role: 'student',
+          purchasedCourses: { $in: courseIds }
+        }
+      },
+      {
+        // Add field to show which courses each student purchased
+        $addFields: {
+          purchasedTutorCourses: {
+            $filter: {
+              input: "$purchasedCourses",
+              as: "course",
+              cond: { $in: ["$$course", courseIds] }
+            }
+          }
+        }
+      },
+      {
+        // Lookup course details for the purchased courses
+        $lookup: {
+          from: 'courses',
+          localField: 'purchasedTutorCourses',
+          foreignField: '_id',
+          as: 'enrolledCourses'
+        }
+      },
+      {
+        // Include only necessary fields for security and privacy
+        $project: {
+          _id: 1,
+          first_name: 1,
+          last_name: 1,
+          email: 1,
+          profile_pic: 1,
+          enrolledCourses: {
+            _id: 1,
+            courseTitle: 1,
+            education_level: 1,
+            price: 1,
+            image: 1
+          },
+          purchaseCount: { $size: "$purchasedTutorCourses" }
+        }
+      },
+      {
+        // Sort by the number of courses purchased (descending)
+        $sort: { purchaseCount: -1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: students.length,
+      data: students
+    });
+
+  } catch (error) {
+    console.error('Error fetching tutor students:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch students',
+      error: error.message
+    });
+  }
+};
+
+
+module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses, searchUsers, updatePassword, getTutorStudents };

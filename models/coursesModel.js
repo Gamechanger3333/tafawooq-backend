@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const courseDetailsSchema = require("./courseDetailsSchema"); 
+const courseDetailsSchema = require("./courseDetailsSchema");
 
 // Main Course schema
 const courseSchema = new mongoose.Schema({
@@ -33,7 +33,7 @@ const courseSchema = new mongoose.Schema({
     required: [true, "Course description is required"],
     minlength: [10, "Description must be at least 10 characters"],
   },
-  
+
   // Course details as a nested object
   courseDetails: {
     type: courseDetailsSchema,
@@ -45,12 +45,47 @@ const courseSchema = new mongoose.Schema({
     default: 0,
     min: [0, "Price cannot be negative"],
   },
-  
+
+  // Track views with timestamps for analytics
+  views: [{
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users"
+    }
+  }],
+
+  // Track purchases with timestamps
+  purchases: [{
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users"
+    }
+  }],
+
+  // Total view and purchase counters for quick access
+  totalViews: {
+    type: Number,
+    default: 0
+  },
+
+  totalPurchases: {
+    type: Number,
+    default: 0
+  },
+
   created_at: {
     type: Date,
     default: Date.now,
     required: true,
-  },
+  }
 });
 
 // Create Course model

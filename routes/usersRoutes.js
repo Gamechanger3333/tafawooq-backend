@@ -3,7 +3,7 @@ const router = express.Router();
 const userController = require("../controllers/usersController");
 const auth = require("../middlewares/authMiddleware");
 const authorize = require('../middlewares/authorize');
-const { uploadOnMulter } = require ("../middlewares/multerMiddleware.js");
+const { uploadOnMulter } = require("../middlewares/multerMiddleware.js");
 
 router.post("/register", userController.registerUser);
 router.post("/login", userController.loginUser);
@@ -18,5 +18,6 @@ router.delete("/:id", auth, userController.deleteUser);
 router.post("/change-profile-pic", auth, uploadOnMulter.single("profile_pic"), userController.changeProfilePic);
 router.patch("/change-profile-pic", auth, uploadOnMulter.single("profile_pic"), userController.changeProfilePic);
 router.patch('/:id/password', auth, userController.updatePassword);
+router.get('/:tutorId/students', auth, authorize('tutor', 'admin'), userController.getTutorStudents);
 
 module.exports = router;
