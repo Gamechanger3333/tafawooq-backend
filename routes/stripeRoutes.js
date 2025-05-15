@@ -1,28 +1,51 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const stripeController = require("../controllers/stripeController");
+const {
+    // Original methods
+    AddCardInfo,
+    RemoveCard,
+
+    // Tutor onboarding
+    createConnectAccount,
+    getAccountLink,
+    getAccountStatus,
+
+    // Course purchasing
+    purchaseCourse,
+
+    // Admin endpoints
+    getAllTransactions,
+    getAdminBalance,
+    adminWithdrawFunds,
+
+    // Tutor earnings
+    getTutorEarnings,
+    getTutorCoursesSales,
+
+    // Webhook
+    handleStripeWebhook
+} = require('../controllers/stripeController');
 const auth = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
-// Route to get students by course - admin only
-router.get("/students-by-course/:courseId", auth, authorize('tutor'), stripeController.getStudentsByCourse);
+// Student routes
+router.post('/add-card', auth, AddCardInfo);
+router.post('/remove-card', auth, RemoveCard);
+router.post('/purchase-course', auth, authorize('student'), purchaseCourse);
 
-// Routes for Admins - restricted to admin role only
-router.post("/create-account", auth, authorize('admin'), stripeController.createSellerAccount);
-router.get("/generate-oauth-link/:userId", auth, authorize('admin'), stripeController.generateOAuthLink);
-router.post("/authorize-seller/:userId", auth, authorize('admin'), stripeController.authorizeSeller);
-router.get("/sellerbalance/:account_id", auth, authorize('admin'), stripeController.getSellerBalance);
-router.get("/transactions", auth, authorize('admin'), stripeController.allTransections);
-router.get("/trackpayment/:id", auth, authorize('admin'), stripeController.trackPayment);
-router.post("/cancelsubscription/:id", auth, authorize('admin'), stripeController.cancelSubscription);
+// Tutor routes
+router.post('/connect-account', auth, authorize('tutor'), createConnectAccount);
+router.get('/account-link', auth, authorize('tutor'), getAccountLink);
+router.get('/account-status', auth, authorize('tutor'), getAccountStatus);
+router.get('/earnings', auth, authorize('tutor'), getTutorEarnings);
+router.get('/course-sales', auth, authorize('tutor'), getTutorCoursesSales);
 
-// Routes for Students - need to add proper role authorization
-router.post("/AddCardInfo", auth, authorize('student', 'parent', 'tutor'), stripeController.AddCardInfo);
-router.post("/removeCard", auth, authorize('student', 'parent', 'tutor'), stripeController.RemoveCard);
-router.post("/credit", auth, authorize('student', 'parent'), stripeController.Checkout);
-router.post("/subscriptiondetail", auth, authorize('student', 'parent', 'tutor'), stripeController.subscriptionDetail);
-router.post("/create-checkout-session", auth, authorize('student', 'parent'), stripeController.userSubscription);
-router.post("/success_payment", auth, authorize('student', 'parent'), stripeController.userSubscriptionAfterSuccess);
-router.post("/refundpayment", auth, authorize('student', 'parent'), stripeController.refundPayment);
+// Admin routes
+router.get('/transactions', auth, authorize('admin'), getAllTransactions);
+router.get('/admin-balance', auth, authorize('admin'), getAdminBalance);
+router.post('/admin-withdraw', auth, authorize('admin'), adminWithdrawFunds);
 
-module.exports = router;
+// Webhook - this endpoint needs to be public
+router.post('/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
+module.exports = router;;

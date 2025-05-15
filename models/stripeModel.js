@@ -9,6 +9,10 @@ const stripeSchema = new mongoose.Schema({
     required: true,
     ref: 'Users',
   },
+  courseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Courses'
+  },
   chargeFor: {
     type: String,
     enum: ['orderCharge', 'appCharge', 'HardwareCharge'],
@@ -27,10 +31,6 @@ const stripeSchema = new mongoose.Schema({
   },
   paymentIntentId: {
     type: String
-  },
-  courseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Courses'
   }
 }, {timestamps: true});
 

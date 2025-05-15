@@ -32,9 +32,15 @@ const userSchema = new mongoose.Schema({
     enum: ['guest','student', 'tutor', 'admin', 'parent'],
     default: 'student'
   },
+  // Stripe Connect account for tutors
   stripe_account_id: {
     type: String,
     default: null
+  },
+  stripe_account_status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected'],
+    default: 'pending'
   },
   stripe_refresh_token: {
     type: String
@@ -42,6 +48,7 @@ const userSchema = new mongoose.Schema({
   stripe_access_token: {
     type: String
   },
+  // Stripe Customer ID for students making payments
   stripeCustomerId: {
     type: String
   },

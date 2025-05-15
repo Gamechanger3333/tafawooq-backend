@@ -64,7 +64,7 @@ const registerUser = async (req, res) => {
         role: user.role
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' } // Token expires in 24 hours
+      { expiresIn: '90d' } // Token expires in 24 hours
     );
 
     res.status(201).json({
@@ -121,7 +121,7 @@ const loginUser = async (req, res) => {
         role: user.role
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' } // Token expires in 24 hours
+      { expiresIn: '90d' } // Token expires in 24 hours
     );
 
     // 8. Remove sensitive data from response
