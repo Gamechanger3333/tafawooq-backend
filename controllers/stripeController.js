@@ -5,7 +5,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const mongoose = require("mongoose");
 
 // Constants
-const PLATFORM_FEE_PERCENT = 20; // 20% platform fee
+const PLATFORM_FEE_PERCENT = 25; // 25% platform fee
 
 // Helper functions
 const createStripeToken = async (cardNumber, expiryDate, cvv, cardName) => {
@@ -66,7 +66,7 @@ const createConnectAccount = async (req, res) => {
     // Create a Stripe Connect Express account
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'PAK', // Default to US, can be made dynamic based on user's country
+      country: 'US', // Default to US, can be made dynamic based on user's country
       email: user.email,
       capabilities: {
         transfers: { requested: true },
