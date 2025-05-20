@@ -11,7 +11,7 @@ process.on("uncaughtException", (err) => {
     process.exit(1);
 });
 
-//connection to the database
+// Connection to the database
 const connectDB = async () => {
     try {
         const connection = await mongoose.connect(process.env.DATABASE);
@@ -26,9 +26,10 @@ const connectDB = async () => {
 
 const startServer = async () => {
     try {
-        const PORT = process.env.PORT;
+        const PORT = process.env.PORT || 5000;
         const serverListener = server.listen(PORT, () => {
             console.log(`Server is running on http://localhost:${PORT}/`);
+            console.log(`Socket.io server initialized and listening for connections`);
         });
 
         process.on("unhandledRejection", (err) => {

@@ -12,14 +12,17 @@ const programSubjectRoutes = require("./routes/progSubRoutes");
 const courseRoutes = require("./routes/coursesRoutes");
 const userRoutes = require("./routes/usersRoutes");
 const stripeRoutes = require('./routes/stripeRoutes');
-const messageRoutes = require('./routes/messagesRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
+const { initializeSocketServer } = require("./sockets/socketServer");
 
 console.log("Starting application...");
 
 const app = express();
 const server = http.createServer(app);
+
+// Initialize socket server
+const io = initializeSocketServer(server);
 
 const corsOptions = {
     origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
@@ -49,7 +52,6 @@ app.use("/program-subjects", programSubjectRoutes);
 app.use("/courses", courseRoutes);
 app.use("/users", userRoutes);
 app.use("/stripe", stripeRoutes);
-app.use("/messages", messageRoutes);
 app.use('/assignments', assignmentRoutes);
 app.use("/meetings", meetingRoutes);
 
@@ -63,4 +65,4 @@ app.all("*", (req, res) => {
 });
 
 console.log("Application setup complete");
-module.exports = { app, server };
+module.exports = { app, server,io  };

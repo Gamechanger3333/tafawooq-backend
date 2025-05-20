@@ -160,7 +160,7 @@ const getAccountStatus = async (req, res) => {
     }
 
     const account = await stripe.accounts.retrieve(user.stripe_account_id);
-    console.log('[backed stripeS STATUS]', account)
+    // console.log('[backed stripeS STATUS]', account)
 
     const isComplete =
       account.details_submitted &&
