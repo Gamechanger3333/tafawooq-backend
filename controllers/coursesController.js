@@ -16,7 +16,41 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // Add this code here - beginning of new code
+    // ✅ STEP 1: Parse courseDetails if it arrives as string (from FormData)
+    if (typeof req.body.courseDetails === 'string') {
+      try {
+        req.body.courseDetails = JSON.parse(req.body.courseDetails);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid JSON format for courseDetails",
+        });
+      }
+    }
+
+    // ✅ STEP 2: Upload image to Cloudinary
+    let imageUrl = null;
+    if (req.file) {
+      const uploadResult = await uploadFileToCloudinary(req.file.path, {
+        folder: "courses",
+      });
+
+      if (!uploadResult) {
+        return res.status(400).json({
+          success: false,
+          message: "Failed to upload image to Cloudinary",
+        });
+      }
+
+      imageUrl = uploadResult.secure_url;
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Course image is required",
+      });
+    }
+
+    // ✅ STEP 3: Fill in country if not provided
     if (!req.body.country_id && req.user.country_id) {
       req.body.country_id = req.user.country_id;
     } else if (!req.body.country_id && !req.user.country_id) {
@@ -25,9 +59,8 @@ const createCourse = async (req, res) => {
         message: "Country is required. Please update your profile with a country or specify a country for this course."
       });
     }
-    // End of new code
 
-    // Validate country exists (keep your existing validation)
+    // ✅ STEP 4: Validate country and education level
     if (!req.body.country_id) {
       return res.status(400).json({
         success: false,
@@ -43,7 +76,6 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // Validate education level
     if (!req.body.education_level) {
       return res.status(400).json({
         success: false,
@@ -62,17 +94,17 @@ const createCourse = async (req, res) => {
     console.log("BEFORE SAVE - req.body.country_id:", req.body.country_id);
     console.log("BEFORE SAVE - req.body.education_level:", req.body.education_level);
 
-    // Log the course object right after creation
+    // ✅ STEP 5: Create course document
     const course = new Courses({
       ...req.body,
+      image: imageUrl,
       user_id: req.user._id
     });
 
-    console.log("AFTER CREATION - course.country_id:", course);
+    console.log("AFTER CREATION - course:", course);
 
-    // Then validate and save
+    // ✅ STEP 6: Validate and save
     await course.validate();
-
     await course.save();
 
     res.status(201).json({
@@ -84,7 +116,6 @@ const createCourse = async (req, res) => {
     console.error(`[CREATE COURSE] Error:`, error.message);
 
     if (error.name === "ValidationError") {
-      // Extract validation errors
       const errors = Object.keys(error.errors).reduce((acc, key) => {
         acc[key] = error.errors[key].message;
         return acc;

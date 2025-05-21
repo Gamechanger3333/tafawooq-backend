@@ -5,7 +5,13 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const authorize = require('../middlewares/authorize');
 const { uploadOnMulter } = require('../middlewares/multerMiddleware');
 
-router.post("/", authMiddleware, authorize('tutor', 'admin'), courseController.createCourse);
+router.post("/", 
+  authMiddleware, 
+  authorize('tutor', 'admin'), 
+  uploadOnMulter.single('image'),
+  courseController.createCourse
+);
+
 router.get("/", courseController.getAllCourses);
 router.get("/:id", authMiddleware, courseController.trackCourseView, courseController.getCourseById);
 router.put("/:id", authMiddleware, authorize('tutor', 'admin'), courseController.updateCourse);
