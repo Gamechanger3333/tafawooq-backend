@@ -45,7 +45,7 @@ const createConnectAccount = async (req, res) => {
   const userId = req.user._id;
 
   try {
-    const user = await Users.findById(userId);
+    const user = await Users.findById(userId).populate('country_id');;
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -63,10 +63,24 @@ const createConnectAccount = async (req, res) => {
       });
     }
 
+
+    // Get the country code from the populated country data
+    const countryCode = user.country_id?.code;
+
+    console.log("[createConnectAccount - countryCode]", countryCode)
+
+
+    if (!countryCode) {
+      return res.status(400).json({
+        error: "Country information is required to create a Stripe account"
+      });
+    }
+
+
     // Create a Stripe Connect Express account
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'US', // Default to US, can be made dynamic based on user's country
+      country: countryCode.toUpperCase(), // can be made dynamic based on user's country
       email: user.email,
       capabilities: {
         transfers: { requested: true },
@@ -77,7 +91,7 @@ const createConnectAccount = async (req, res) => {
         name: `${user.first_name} ${user.last_name}`,
         url: process.env.WEBSITE_URL || 'https://yourtutoringwebsite.com',
       },
-      metadata: { userId: userId.toString() }
+      metadata: { userId: userId.toString(), userCountry: user.country_id.name }
     });
 
     // Save the account ID to the user
@@ -96,7 +110,9 @@ const createConnectAccount = async (req, res) => {
       success: true,
       message: "Stripe Connect account created",
       accountId: account.id,
-      onboardingUrl: accountLink.url
+      onboardingUrl: accountLink.url,
+      country: user.country_id.name,
+      countryCode: countryCode.toUpperCase()
     });
   } catch (error) {
     console.error("Error creating Connect account:", error);
@@ -437,12 +453,12 @@ const getAllTransactions = async (req, res) => {
           const paymentIntent = await stripe.paymentIntents.retrieve(
             transaction.paymentIntentId
           );
-          
+
           // Calculate fees based on our platform fee percentage instead of relying on transfer expansion
           const totalAmount = paymentIntent.amount / 100;
           const applicationFee = totalAmount * (PLATFORM_FEE_PERCENT / 100);
           const tutorAmount = totalAmount - applicationFee;
-          
+
           // Get receipt URL if available
           let receiptUrl = null;
           if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {

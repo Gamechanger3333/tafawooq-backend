@@ -34,9 +34,9 @@ router.post('/remove-card', auth, RemoveCard);
 router.post('/purchase-course', auth, authorize('student'), purchaseCourse);
 
 // Tutor routes
+router.get('/account-status', auth, authorize('tutor'), getAccountStatus);
 router.post('/connect-account', auth, authorize('tutor'), createConnectAccount);
 router.get('/account-link', auth, authorize('tutor'), getAccountLink);
-router.get('/account-status', auth, authorize('tutor'), getAccountStatus);
 router.get('/earnings', auth, authorize('tutor'), getTutorEarnings);
 router.get('/course-sales', auth, authorize('tutor'), getTutorCoursesSales);
 

@@ -6,6 +6,8 @@ const authorize = require('../middlewares/authorize');
 const { uploadOnMulter } = require("../middlewares/multerMiddleware.js");
 
 router.post("/register", userController.registerUser);
+router.post("/verify-otp", userController.verifyOtp);
+router.post("/resend-otp", userController.resendOtp);
 router.post("/login", userController.loginUser);
 
 // Protected routes (require authentication)
