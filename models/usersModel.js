@@ -17,10 +17,21 @@ const userSchema = new mongoose.Schema({
   },
   otp: {
     type: String
-  }, // hashed OTP
+  },
   otpExpiresAt: {
     type: Date
-  }, // 5 or 10 min expiry
+  },
+  // Password reset fields
+  resetToken: {
+    type: String
+  },
+  resetTokenExpiresAt: {
+    type: Date
+  },
+  lastOtpRequestTime: {
+    type: Date,
+    default: null
+  },
   first_name: {
     type: String,
     required: true,

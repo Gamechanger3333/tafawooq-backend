@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 
 const OAuth2 = google.auth.OAuth2;
 
-const sendOtp = async (email, otp) => {
+const sendOtp = async (email, otp, type = 'verification') => {
     try {
         const oauth2Client = new OAuth2(
             process.env.GMAIL_CLIENT_ID,
@@ -29,14 +29,30 @@ const sendOtp = async (email, otp) => {
             },
         });
 
+        // Different email templates based on type
+        const emailTemplates = {
+            verification: {
+                subject: "Email Verification Code",
+                title: "Email Verification",
+                message: "Your verification code is:"
+            },
+            passwordReset: {
+                subject: "Password Reset Code",
+                title: "Password Reset",
+                message: "Your password reset code is:"
+            }
+        };
+
+        const template = emailTemplates[type] || emailTemplates.verification;
+
         const mailOptions = {
             from: `"Tafawoq" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: "Your OTP Code",
+            subject: template.subject,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Email Verification</h2>
-                    <p>Your verification code is:</p>
+                    <h2 style="color: #333;">${template.title}</h2>
+                    <p>${template.message}</p>
                     <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0;">
                         <h1 style="color: #007bff; font-size: 32px; margin: 0;">${otp}</h1>
                     </div>
