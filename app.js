@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -26,7 +28,7 @@ const server = http.createServer(app);
 const io = initializeSocketServer(server);
 
 const corsOptions = {
-    origin: ["http://localhost:3000", "https://tafawoq-frontend-opal.vercel.app"],
+    origin: ["http://localhost:3000", "http://localhost:3001", "https://tafawoq-frontend-opal.vercel.app"],
     methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
     allowedHeaders: "X-Requested-With, Content-Type, Authorization",
     exposedHeaders: ['Content-Disposition'],
@@ -68,4 +70,5 @@ app.all("*", (req, res) => {
 });
 
 console.log("Application setup complete");
+
 module.exports = { app, server, io };
