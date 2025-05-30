@@ -10,6 +10,40 @@ const createCountry = async (req, res) => {
   }
 };
 
+const createAllCountries = async (req, res) => {
+  try {
+    const countries = req.body;
+    
+    if (!Array.isArray(countries)) {
+      return res.status(400).json({ message: 'Request body must be an array of countries' });
+    }
+
+    const createdCountries = await Countries.insertMany(countries, { 
+      ordered: false
+    });
+    
+    res.status(201).json({
+      message: `Successfully created ${createdCountries.length} countries`,
+      countries: createdCountries
+    });
+  } catch (error) {
+
+    if (error.code === 11000) {
+      const duplicateErrors = error.writeErrors || [];
+      const successCount = error.result ? error.result.insertedCount : 0;
+      
+      res.status(207).json({
+        message: `Bulk insert completed with some duplicates`,
+        successCount: successCount,
+        duplicateCount: duplicateErrors.length,
+        duplicates: duplicateErrors.map(err => err.op)
+      });
+    } else {
+      res.status(400).json({ message: error.message });
+    }
+  }
+};
+
 const getAllCountries = async (req, res) => {
   try {
     const countries = await Countries.find();
@@ -61,4 +95,4 @@ const deleteCountry = async (req, res) => {
   }
 };
 
-module.exports = { createCountry, getAllCountries, getCountryById, updateCountry, deleteCountry };
+module.exports = { createCountry, createAllCountries, getAllCountries, getCountryById, updateCountry, deleteCountry };

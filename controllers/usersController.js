@@ -82,8 +82,7 @@ const registerUser = async (req, res) => {
           role: existingUser.role,
           isVerified: false
         },
-        process.env.JWT_SECRET,
-        { expiresIn: '90d' }
+        process.env.JWT_SECRET
       );
 
       return res.status(200).json({
@@ -128,8 +127,7 @@ const registerUser = async (req, res) => {
         role: user.role,
         isVerified: false
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '90d' }
+      process.env.JWT_SECRET
     );
 
     res.status(201).json({
@@ -182,8 +180,7 @@ const verifyOtp = async (req, res) => {
         role: user.role,
         isVerified: true
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '90d' } // Full expiry for verified users
+      process.env.JWT_SECRET
     );
 
     // Remove sensitive fields from response
@@ -299,8 +296,7 @@ const loginUser = async (req, res) => {
         role: user.role,
         isVerified: true
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '90d' } // Token expires in 24 hours
+      process.env.JWT_SECRET
     );
 
     // 8. Remove sensitive data from response
@@ -737,6 +733,5 @@ const getTutorStudents = async (req, res) => {
     });
   }
 };
-
 
 module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses, searchUsers, updatePassword, getTutorStudents, verifyOtp, resendOtp };
