@@ -28,7 +28,7 @@ const server = http.createServer(app);
 const io = initializeSocketServer(server);
 
 const corsOptions = {
-    origin: ["http://localhost:3000", "http://localhost:3001", "https://tafawoq-frontend-opal.vercel.app"],
+    origin: ["http://localhost:3000", "http://localhost:3001", "https://tafawoq-frontend-opal.vercel.app", "http://35.181.5.235"],
     methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
     allowedHeaders: "X-Requested-With, Content-Type, Authorization",
     exposedHeaders: ['Content-Disposition'],
