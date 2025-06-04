@@ -36,75 +36,25 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // 4. Check if user already exists
+    // 4. Check if user already exists in database
     const existingUser = await Users.findOne({ email });
-
     if (existingUser) {
-      // If user exists and is already verified, return conflict
-      if (existingUser.isVerified) {
-        return res.status(409).json({ message: "User with this email already exists." });
-      }
-
-      // If user exists but is not verified, update their information and resend OTP
-      console.log(`[Registration] User ${email} exists but not verified. Updating info and resending OTP.`);
-
-      // 5. Hash the new password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Generate new OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
-      const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-      // Update existing user with new data
-      existingUser.first_name = userData.first_name || existingUser.first_name;
-      existingUser.last_name = userData.last_name || existingUser.last_name;
-      existingUser.role = userData.role || existingUser.role;
-      existingUser.password_hash = hashedPassword;
-      existingUser.country_id = country_id;
-      existingUser.otp = otpHash;
-      existingUser.otpExpiresAt = otpExpiresAt;
-      existingUser.isVerified = false;
-
-      await existingUser.save();
-
-      // Send OTP Email
-      await sendOtp(email, otp);
-
-      // Remove password from response
-      const { password_hash, otp: userOtp, ...userResponse } = existingUser.toObject();
-
-      // Generate JWT token
-      const token = jwt.sign(
-        {
-          userId: existingUser._id,
-          email: existingUser.email,
-          role: existingUser.role,
-          isVerified: false
-        },
-        process.env.JWT_SECRET
-      );
-
-      return res.status(200).json({
-        user: userResponse,
-        token,
-        message: "Registration updated. Please verify your email with the OTP sent."
-      });
+      return res.status(409).json({ message: "User with this email already exists." });
     }
 
-    // 5. Hash password securely (for new user)
+    // 5. Hash password securely
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate OTP
+    // Generate OTP for email verification
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Send OTP Email
+    // Send OTP Email first
     await sendOtp(email, otp);
 
-    // 6. Create new user in database
-    const user = new Users({
+    // 6. Create temporary user data object (not saved to database yet)
+    const tempUserData = {
       ...userData,
       email,
       password_hash: hashedPassword,
@@ -112,91 +62,161 @@ const registerUser = async (req, res) => {
       isVerified: false,
       otp: otpHash,
       otpExpiresAt
-    });
+    };
 
-    await user.save();
-
-    // 7. Remove password from response
-    const { password_hash, otp: userOtp, ...userResponse } = user.toObject();
-
-    // 8. Generate JWT token
-    const token = jwt.sign(
+    // Store temporary user data in JWT token
+    const tempToken = jwt.sign(
       {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-        isVerified: false
+        tempUserData: tempUserData,
+        type: 'registration'
       },
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' } // Expires in 10 minutes
     );
 
-    res.status(201).json({
+    // 7. Create a user-like object for frontend compatibility (without sensitive data)
+    const userResponse = {
+      email: tempUserData.email,
+      first_name: tempUserData.first_name,
+      last_name: tempUserData.last_name,
+      role: tempUserData.role,
+      country_id: tempUserData.country_id,
+      isVerified: false,
+      // Add any other non-sensitive fields your frontend expects
+    };
+
+    // 8. Return response that matches your frontend expectations
+    res.status(200).json({
       user: userResponse,
-      token,
-      message: "Registration successful. Please verify your email with the OTP sent."
+      token: tempToken, // This is temporary token, not permanent JWT
+      message: "Registration initiated. Please verify your email with the OTP sent.",
+      requiresVerification: true
     });
+
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: "Internal server error. Please try again later." });
   }
 };
 
-
 const verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, token } = req.body; // token can be either tempToken or regular token
 
     if (!email || !otp) {
       return res.status(400).json({ message: "Email and OTP are required." });
     }
 
-    const user = await Users.findOne({ email }).populate('country_id');
-    if (!user || !user.otp || !user.otpExpiresAt) {
-      return res.status(400).json({ message: "Invalid request or already verified." });
+    // First check if user already exists in database (existing user flow)
+    const existingUser = await Users.findOne({ email }).populate('country_id');
+    
+    if (existingUser) {
+      // Handle existing user verification (your original logic)
+      if (!existingUser.otp || !existingUser.otpExpiresAt) {
+        return res.status(400).json({ message: "Invalid request or already verified." });
+      }
+
+      if (existingUser.isVerified) {
+        return res.status(400).json({ message: "User is already verified." });
+      }
+
+      const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+      if (existingUser.otp !== hashedOtp || existingUser.otpExpiresAt < Date.now()) {
+        return res.status(400).json({ message: "Invalid or expired OTP." });
+      }
+
+      // Update user as verified
+      existingUser.isVerified = true;
+      existingUser.otp = undefined;
+      existingUser.otpExpiresAt = undefined;
+      await existingUser.save();
+
+      // Generate new token with verified status
+      const newToken = jwt.sign(
+        {
+          userId: existingUser._id,
+          email: existingUser.email,
+          role: existingUser.role,
+          isVerified: true
+        },
+        process.env.JWT_SECRET
+      );
+
+      const { password_hash, otp: otpField, otpExpiresAt: otpExpires, ...userResponse } = existingUser.toObject();
+
+      return res.status(200).json({
+        message: "Email verified successfully.",
+        token: newToken,
+        user: userResponse
+      });
     }
 
-    // Check if user is already verified
-    if (user.isVerified) {
-      return res.status(400).json({ message: "User is already verified." });
+    // Handle new user registration verification
+    if (!token) {
+      return res.status(400).json({ message: "Token is required for verification." });
     }
 
-    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
-
-    if (user.otp !== hashedOtp || user.otpExpiresAt < Date.now()) {
-      return res.status(400).json({ message: "Invalid or expired OTP." });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid or expired token." });
     }
 
-    // Update user as verified
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpiresAt = undefined;
-    await user.save();
+    // Check if it's a registration token
+    if (decoded.type === 'registration' && decoded.tempUserData) {
+      const tempUserData = decoded.tempUserData;
 
-    // Generate new token with verified status
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-        isVerified: true
-      },
-      process.env.JWT_SECRET
-    );
+      // Verify the OTP matches
+      const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
 
-    // Remove sensitive fields from response
-    const { password_hash, otp: otpField, otpExpiresAt: otpExpires, ...userResponse } = user.toObject();
+      if (tempUserData.otp !== hashedOtp || new Date(tempUserData.otpExpiresAt) < Date.now()) {
+        return res.status(400).json({ message: "Invalid or expired OTP." });
+      }
 
-    res.status(200).json({
-      message: "Email verified successfully.",
-      token,
-      user: userResponse
-    });
+      // NOW create and save the user to database with isVerified: true
+      const newUser = new Users({
+        ...tempUserData,
+        isVerified: true, // Set to true since OTP is verified
+        otp: undefined,   // Remove OTP fields
+        otpExpiresAt: undefined
+      });
+
+      await newUser.save();
+
+      // Populate country_id for response
+      await newUser.populate('country_id');
+
+      // Generate permanent JWT token for the new verified user
+      const permanentToken = jwt.sign(
+        {
+          userId: newUser._id,
+          email: newUser.email,
+          role: newUser.role,
+          isVerified: true
+        },
+        process.env.JWT_SECRET
+      );
+
+      // Remove sensitive fields from response
+      const { password_hash, ...userResponse } = newUser.toObject();
+
+      return res.status(201).json({
+        message: "Registration completed successfully. Email verified and user created.",
+        token: permanentToken,
+        user: userResponse
+      });
+    }
+
+    // If we reach here, it's an invalid token type
+    return res.status(400).json({ message: "Invalid token type." });
+
   } catch (error) {
     console.error("OTP verification error:", error);
     res.status(500).json({ message: "Internal server error. Please try again later." });
   }
 };
-
 
 const resendOtp = async (req, res) => {
   try {
