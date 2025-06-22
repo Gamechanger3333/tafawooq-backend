@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const Users = require("../models/usersModel");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { uploadFileToCloudinary } = require("../utils/Cloudinary.js");
 const Courses = require("../models/coursesModel.js");
