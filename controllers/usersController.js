@@ -42,6 +42,14 @@ const registerUser = async (req, res) => {
       return res.status(409).json({ message: "User with this email already exists." });
     }
 
+    // Add this RIGHT BEFORE bcrypt.hash
+    console.log('=== BCRYPT DEBUG ===');
+    console.log('password type:', typeof password);
+    console.log('password value:', password);
+    console.log('password JSON:', JSON.stringify(password));
+    console.log('req.body:', JSON.stringify(req.body));
+    console.log('==================');
+
     // 5. Hash password securely
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -109,7 +117,7 @@ const verifyOtp = async (req, res) => {
 
     // First check if user already exists in database (existing user flow)
     const existingUser = await Users.findOne({ email }).populate('country_id');
-    
+
     if (existingUser) {
       // Handle existing user verification (your original logic)
       if (!existingUser.otp || !existingUser.otpExpiresAt) {
