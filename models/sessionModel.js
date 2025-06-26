@@ -19,9 +19,8 @@ const sessionSchema = new mongoose.Schema({
         type: Number, 
         required: true 
     }, // in minutes
-    field: { 
-        type: String,
-        required: true 
+    price: { 
+        type: Number,
     },
     courseName: { 
         type: String,

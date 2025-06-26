@@ -363,9 +363,6 @@ const getUserById = async (req, res) => {
   try {
     // 1. Ensure request is coming from an authorized admin or the user themselves
     const userId = req.params.id;
-    if (!(req.user && (req.user.role === "admin" || req.user._id.toString() === userId))) {
-      return res.status(403).json({ message: "Unauthorized access. You can only view your own profile or require admin privileges." });
-    }
 
     // 2. Fetch user by ID
     const user = await Users.findById(userId).select('-password_hash').populate('country_id').populate('purchasedCourses');
