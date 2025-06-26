@@ -17,6 +17,8 @@ const forgotPasswordRoutes = require("./routes/forgotPasswordRoutes");
 const stripeRoutes = require('./routes/stripeRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
+const sessionRoutes = require("./routes/sessionRoutes.js");
+const teacherProfileRoutes = require("./routes/teacherProfileRoutes.js");
 const { initializeSocketServer } = require("./sockets/socketServer");
 
 console.log("Starting application...");
@@ -29,9 +31,9 @@ const io = initializeSocketServer(server);
 
 const corsOptions = {
     origin: [
-        "http://localhost:3000", 
-        "http://localhost:3001", 
-        "https://tafawoq-frontend-opal.vercel.app", 
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://tafawoq-frontend-opal.vercel.app",
         "http://35.181.5.235",
         "https://tafawouk.com",
         "https://www.tafawouk.com",
@@ -67,6 +69,8 @@ app.use("/password", forgotPasswordRoutes);
 app.use("/stripe", stripeRoutes);
 app.use('/assignments', assignmentRoutes);
 app.use("/meetings", meetingRoutes);
+app.use("/sessions", sessionRoutes);
+app.use("/teachers", teacherProfileRoutes);
 
 app.all("*", (req, res) => {
     const message = `Can't find ${req.originalUrl} on this server!`;
