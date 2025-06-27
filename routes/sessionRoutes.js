@@ -9,6 +9,8 @@ router.post("/", authMiddleware, sessionController.createSession);
 router.get("/user/:role/:userId", authMiddleware, sessionController.getUserSessions);
 router.get("/:sessionId", authMiddleware, sessionController.getSessionById);
 router.patch("/status/:sessionId", authMiddleware, sessionController.updateSessionStatus);
+router.get("/tutor/:tutorId/approved", authMiddleware, sessionController.getTutorApprovedSessions);
+router.get("/student/:studentId/approved", authMiddleware, sessionController.getStudentApprovedSessions);
 
 // Teacher booking routes
 router.get("/teachers/search", authMiddleware, sessionController.getTeachersForBooking);

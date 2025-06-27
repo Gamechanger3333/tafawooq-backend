@@ -12,6 +12,7 @@ const {
 
     // Course purchasing
     purchaseCourse,
+    purchaseSessions,
 
     // Admin endpoints
     getAllTransactions,
@@ -24,6 +25,7 @@ const {
 
     // Webhook
     handleStripeWebhook
+
 } = require('../controllers/stripeController');
 const auth = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
@@ -32,6 +34,7 @@ const authorize = require("../middlewares/authorize");
 router.post('/add-card', auth, AddCardInfo);
 router.post('/remove-card', auth, RemoveCard);
 router.post('/purchase-course', auth, authorize('student'), purchaseCourse);
+router.post('/purchase-session', auth, authorize('student'), purchaseSessions);
 
 // Tutor routes
 router.get('/account-status', auth, authorize('tutor'), getAccountStatus);

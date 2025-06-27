@@ -2,7 +2,7 @@ const Users = require("../models/usersModel");
 const { stripemodel } = require("../models/stripeModel");
 const Courses = require("../models/coursesModel");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const mongoose = require("mongoose");
+const Session = require("../models/sessionModel");
 
 // Constants
 const PLATFORM_FEE_PERCENT = 25; // 25% platform fee
@@ -414,6 +414,135 @@ const purchaseCourse = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to process payment"
+    });
+  }
+};
+
+/**
+ * Session purchase endpoint purchaseSessions - handles payment with commission split
+ */
+const purchaseSessions = async (req, res) => {
+  const studentId = req.user._id;
+  const { teacherId, amount } = req.body;
+
+  try {
+    // Find the teacher
+    const teacher = await Users.findById(teacherId);
+
+    console.log("Teacher found:", teacher);
+    console.log("Teacher ID being searched:", teacherId);
+
+
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    // Verify teacher has stripe account
+    if (!teacher.stripe_account_id) {
+      return res.status(400).json({ error: "This teacher hasn't completed their payment setup yet." });
+    }
+
+    // Find the student
+    const student = await Users.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Check if student has a payment method
+    if (!student.cardInfo || student.cardInfo.length === 0) {
+      return res.status(400).json({ error: "No payment method available. Please add a card first." });
+    }
+
+    // Find primary card or use the first one
+    const primaryCard = student.cardInfo.find(card => card.primary) || student.cardInfo[0];
+
+    const totalAmountInCents = Math.round(amount * 100);
+    const platformFeeInCents = Math.round(totalAmountInCents * (PLATFORM_FEE_PERCENT / 100));
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: totalAmountInCents,
+      currency: 'usd',
+      customer: student.stripeCustomerId,
+      payment_method: primaryCard.paymentMethodId,
+      confirm: true,
+      description: `Advance Payment to ${teacher.first_name} ${teacher.last_name}`,
+      metadata: {
+        studentId: studentId.toString(),
+        teacherId: teacherId.toString(),
+        paymentType: 'advance_payment'
+      },
+      application_fee_amount: platformFeeInCents,
+      transfer_data: {
+        destination: teacher.stripe_account_id,
+      },
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never'
+      }
+    });
+
+    // If payment is successful
+    if (paymentIntent.status === 'succeeded') {
+      // Save payment record
+      const paymentRecord = new stripemodel({
+        charge: JSON.stringify(paymentIntent),
+        userId: studentId,
+        chargeFor: 'appCharge',
+        amount: amount,
+        status: paymentIntent.status,
+        paymentIntentId: paymentIntent.id,
+        plan: 'Advance Payment'
+      });
+
+      await paymentRecord.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Advance payment processed successfully.",
+        payment: {
+          id: paymentIntent.id,
+          status: paymentIntent.status,
+          amount: amount,
+          platformFee: platformFeeInCents / 100,
+          teacherReceives: (totalAmountInCents - platformFeeInCents) / 100,
+          created: new Date(paymentIntent.created * 1000).toISOString()
+        }
+      });
+
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Payment failed or requires additional authentication",
+        paymentIntent: {
+          id: paymentIntent.id,
+          status: paymentIntent.status,
+          client_secret: paymentIntent.client_secret
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error("Advance payment error:", error);
+
+    // Handle Stripe errors
+    if (error.type === 'StripeCardError') {
+      return res.status(400).json({
+        success: false,
+        error: "Payment failed: " + error.message
+      });
+    }
+
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid payment request: " + error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process advance payment"
     });
   }
 };
@@ -853,5 +982,7 @@ module.exports = {
   getTutorCoursesSales,
 
   // Webhook
-  handleStripeWebhook
+  handleStripeWebhook,
+
+  purchaseSessions
 };

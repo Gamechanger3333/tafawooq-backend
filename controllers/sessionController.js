@@ -318,4 +318,138 @@ const getStudentDashboard = async (req, res) => {
     }
 };
 
-module.exports = { createSession, getUserSessions, getSessionById, updateSessionStatus, getTeachersForBooking, addTeacherToFavorites, removeTeacherFromFavorites, getTeacherAvailability, getStudentDashboard };
+
+// Get all approved sessions for a specific tutor
+const getTutorApprovedSessions = async (req, res) => {
+    try {
+        const { tutorId } = req.params;
+        const { startDate, endDate, limit, page = 1 } = req.query;
+
+        // Validate that tutor exists and is actually a tutor
+        const tutor = await Users.findById(tutorId);
+        if (!tutor || tutor.role !== 'tutor') {
+            return res.status(404).json({ message: "Tutor not found" });
+        }
+
+        // Build query for approved sessions
+        let query = {
+            teacherId: tutorId,
+            status: 'approved'
+        };
+
+        // Add date range filter if provided
+        if (startDate && endDate) {
+            query.date = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
+            };
+        }
+
+        // Calculate pagination
+        const pageSize = limit ? parseInt(limit) : 10;
+        const skip = (parseInt(page) - 1) * pageSize;
+
+        // Get approved sessions with student details
+        const sessions = await Session.find(query)
+            .populate('studentId', 'first_name last_name profile_pic email')
+            .populate('teacherId', 'first_name last_name profile_pic')
+            .sort({ date: -1 }) // Most recent first
+            .skip(skip)
+            .limit(pageSize);
+
+        // Get total count for pagination
+        const totalSessions = await Session.countDocuments(query);
+        const totalPages = Math.ceil(totalSessions / pageSize);
+
+        // Calculate some statistics
+        const totalEarnings = sessions.reduce((sum, session) => sum + (session.price || 0), 0);
+        const totalHours = sessions.reduce((sum, session) => sum + (session.duration || 0), 0) / 60;
+
+        res.json({
+            sessions,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalSessions,
+                hasNext: parseInt(page) < totalPages,
+                hasPrev: parseInt(page) > 1
+            },
+            statistics: {
+                totalEarnings,
+                totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
+                averageSessionPrice: sessions.length > 0 ? Math.round((totalEarnings / sessions.length) * 100) / 100 : 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Get all approved sessions for a specific student
+const getStudentApprovedSessions = async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const { startDate, endDate, limit, page = 1 } = req.query;
+
+        // Validate that student exists and is actually a student
+        const student = await Users.findById(studentId);
+        if (!student || student.role !== 'student') {
+            return res.status(404).json({ message: "Student not found" });
+        }
+
+        // Build query for approved sessions
+        let query = {
+            studentId: studentId,
+            status: 'approved'
+        };
+
+        // Add date range filter if provided
+        if (startDate && endDate) {
+            query.date = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
+            };
+        }
+
+        // Calculate pagination
+        const pageSize = limit ? parseInt(limit) : 10;
+        const skip = (parseInt(page) - 1) * pageSize;
+
+        // Get approved sessions with teacher details
+        const sessions = await Session.find(query)
+            .populate('teacherId', 'first_name last_name profile_pic email')
+            .populate('studentId', 'first_name last_name profile_pic')
+            .sort({ date: -1 }) // Most recent first
+            .skip(skip)
+            .limit(pageSize);
+
+        // Get total count for pagination
+        const totalSessions = await Session.countDocuments(query);
+        const totalPages = Math.ceil(totalSessions / pageSize);
+
+        // Calculate some statistics
+        const totalSpent = sessions.reduce((sum, session) => sum + (session.price || 0), 0);
+        const totalHours = sessions.reduce((sum, session) => sum + (session.duration || 0), 0) / 60;
+
+        res.json({
+            sessions,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalSessions,
+                hasNext: parseInt(page) < totalPages,
+                hasPrev: parseInt(page) > 1
+            },
+            statistics: {
+                totalSpent,
+                totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
+                averageSessionPrice: sessions.length > 0 ? Math.round((totalSpent / sessions.length) * 100) / 100 : 0,
+                upcomingSessions: sessions.filter(session => new Date(session.date) > new Date()).length
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { createSession, getUserSessions, getSessionById, updateSessionStatus, getTeachersForBooking, addTeacherToFavorites, removeTeacherFromFavorites, getTeacherAvailability, getStudentDashboard, getTutorApprovedSessions, getStudentApprovedSessions };
