@@ -1,9 +1,9 @@
 require('dotenv').config();
 
-const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const helmet = require('helmet');
 const http = require('http');
 
 /////// Routes ///////
@@ -19,6 +19,8 @@ const assignmentRoutes = require('./routes/assignmentRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
 const sessionRoutes = require("./routes/sessionRoutes.js");
 const teacherProfileRoutes = require("./routes/teacherProfileRoutes.js");
+const assistantRoutes = require("./routes/assistantRoutes.js");
+const statsRoutes = require("./routes/statsRoutes.js");
 const { initializeSocketServer } = require("./sockets/socketServer");
 
 console.log("Starting application...");
@@ -46,16 +48,20 @@ const corsOptions = {
 };
 
 console.log("Setting up middleware");
+app.use(helmet());
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(cookieParser());
 
-app.use(express.static(path.join(__dirname, "")));
+// NOTE: We intentionally do NOT statically serve the project root here.
+// `tmp/` is only a transient local buffer before files are pushed to
+// Cloudinary (see utils/Cloudinary.js) and controllers/models/config must
+// never be reachable over HTTP. Publicly hosted files are served from
+// Cloudinary's own URLs, not from this server.
 
 // CHANGED: Increased limit from "10kb" to "5mb" for bulk operations
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
-app.use(cookieParser()); // Note: This is duplicate, you can remove one
 
 console.log("Setting up routes");
 // Routes
@@ -71,6 +77,8 @@ app.use('/assignments', assignmentRoutes);
 app.use("/meetings", meetingRoutes);
 app.use("/sessions", sessionRoutes);
 app.use("/teachers", teacherProfileRoutes);
+app.use("/assistant", assistantRoutes);
+app.use("/stats", statsRoutes);
 
 app.all("*", (req, res) => {
     const message = `Can't find ${req.originalUrl} on this server!`;
@@ -78,6 +86,21 @@ app.all("*", (req, res) => {
     res.status(404).json({
         status: "fail",
         message: message,
+    });
+});
+
+// Global error handler — catches anything passed to next(err) or thrown in
+// a synchronous route handler, so a bug in one controller returns a clean
+// JSON error instead of crashing the request (or, in older Express, the
+// whole process on an unhandled rejection).
+app.use((err, req, res, next) => {
+    console.error("Unhandled error:", err);
+
+    const statusCode = err.statusCode || 500;
+
+    res.status(statusCode).json({
+        status: "error",
+        message: statusCode === 500 ? "Internal server error." : err.message
     });
 });
 

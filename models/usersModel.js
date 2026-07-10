@@ -167,6 +167,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  last_login: {
+    type: Date,
+    default: null
+  },
   auth_provider: {
     type: String,
     enum: ['local', 'google', 'facebook'],

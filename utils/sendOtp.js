@@ -1,33 +1,20 @@
-const nodemailer = require("nodemailer");
-const { google } = require('googleapis');
+const { Resend } = require('resend');
 
-const OAuth2 = google.auth.OAuth2;
+let resendClient = null;
+
+const getResendClient = () => {
+    if (!resendClient) {
+        if (!process.env.RESEND_API_KEY) {
+            throw new Error('RESEND_API_KEY is not configured');
+        }
+        resendClient = new Resend(process.env.RESEND_API_KEY);
+    }
+    return resendClient;
+};
 
 const sendOtp = async (email, otp, type = 'verification') => {
     try {
-        const oauth2Client = new OAuth2(
-            process.env.GMAIL_CLIENT_ID,
-            process.env.GMAIL_CLIENT_SECRET,
-            "https://developers.google.com/oauthplayground"
-        );
-
-        oauth2Client.setCredentials({
-            refresh_token: process.env.GMAIL_REFRESH_TOKEN
-        });
-
-        const accessToken = await oauth2Client.getAccessToken();
-
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                type: 'OAuth2',
-                user: process.env.EMAIL_USER,
-                clientId: process.env.GMAIL_CLIENT_ID,
-                clientSecret: process.env.GMAIL_CLIENT_SECRET,
-                refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-                accessToken: accessToken.token,
-            },
-        });
+        const resend = getResendClient();
 
         // Different email templates based on type
         const emailTemplates = {
@@ -45,8 +32,10 @@ const sendOtp = async (email, otp, type = 'verification') => {
 
         const template = emailTemplates[type] || emailTemplates.verification;
 
-        const mailOptions = {
-            from: `"Tafawoq" <${process.env.EMAIL_USER}>`,
+        const fromAddress = process.env.RESEND_FROM_EMAIL || 'Tafawoq <onboarding@resend.dev>';
+
+        const { data, error } = await resend.emails.send({
+            from: fromAddress,
             to: email,
             subject: template.subject,
             html: `
@@ -60,11 +49,15 @@ const sendOtp = async (email, otp, type = 'verification') => {
                     <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
                 </div>
             `,
-        };
+        });
 
-        const result = await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully:', result.messageId);
-        return result;
+        if (error) {
+            console.error('Error sending email via Resend:', error);
+            throw new Error('Failed to send OTP email');
+        }
+
+        console.log('Email sent successfully via Resend:', data?.id);
+        return data;
     } catch (error) {
         console.error('Error sending email:', error);
         throw new Error('Failed to send OTP email');
