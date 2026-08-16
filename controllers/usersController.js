@@ -104,6 +104,38 @@ const registerUser = async (req, res) => {
 };
 
 const JWT_EXPIRES_IN = '7d';
+const REFRESH_TOKEN_EXPIRES_IN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const REFRESH_TOKEN_BYTES = 40;
+
+/**
+ * Issues a fresh short-lived access token + a long-lived refresh token for
+ * a user. The refresh token is only ever returned to the client once, in
+ * plaintext — the DB only ever stores its SHA-256 hash, the same pattern
+ * already used for OTPs and password-reset tokens in this file. Every call
+ * overwrites the stored hash, so calling this again (i.e. rotating) makes
+ * any previously issued refresh token stop working.
+ */
+const issueTokenPair = async user => {
+  const accessToken = jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+      role: user.role,
+      isVerified: true
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+  const refreshToken = crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
+  const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+  user.refreshTokenHash = refreshTokenHash;
+  user.refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+  await user.save();
+
+  return { accessToken, refreshToken };
+};
 
 const verifyOtp = async (req, res) => {
   try {
@@ -142,22 +174,14 @@ const verifyOtp = async (req, res) => {
     user.otpExpiresAt = undefined;
     await user.save();
 
-    const newToken = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-        isVerified: true
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const { accessToken, refreshToken } = await issueTokenPair(user);
 
     const { password_hash, otp: otpField, otpExpiresAt: otpExpires, ...userResponse } = user.toObject();
 
     return res.status(200).json({
       message: "Email verified successfully.",
-      token: newToken,
+      token: accessToken,
+      refreshToken,
       user: userResponse
     });
   } catch (error) {
@@ -262,24 +286,16 @@ const loginUser = async (req, res) => {
     user.last_login = new Date();
     await user.save();
 
-    // 6. Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-        isVerified: true
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    // 6. Generate access + refresh token pair
+    const { accessToken, refreshToken } = await issueTokenPair(user);
 
     // 7. Remove sensitive data from response
     const { password_hash, ...userResponse } = user.toObject();
 
     res.json({
       user: userResponse,
-      token
+      token: accessToken,
+      refreshToken
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -706,4 +722,72 @@ const getTutorStudents = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses, searchUsers, updatePassword, getTutorStudents, verifyOtp, resendOtp };
+/**
+ * POST /users/refresh-token
+ * Exchanges a still-valid refresh token for a brand-new access token +
+ * refresh token pair (rotation). The old refresh token is invalidated the
+ * moment this succeeds, since issueTokenPair() overwrites the stored hash.
+ */
+const refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      return res.status(400).json({ message: "Refresh token is required." });
+    }
+
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+    const user = await Users.findOne({ refreshTokenHash }).select('+refreshTokenHash +refreshTokenExpiresAt');
+
+    if (!user || !user.refreshTokenExpiresAt || user.refreshTokenExpiresAt < Date.now()) {
+      return res.status(401).json({ message: "Invalid or expired refresh token. Please log in again." });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await issueTokenPair(user);
+
+    return res.status(200).json({
+      token: accessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    res.status(500).json({ message: "Internal server error. Please try again later." });
+  }
+};
+
+/**
+ * POST /users/logout
+ * Revokes the current refresh token so it can't be used again even if it
+ * leaks later. The short-lived access token itself is stateless and just
+ * expires naturally — revoking it would require a token blocklist, which
+ * is intentionally out of scope given how short-lived it already is.
+ */
+const logoutUser = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (refreshToken) {
+      const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+      await Users.updateOne(
+        { refreshTokenHash },
+        { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } }
+      );
+    } else if (req.user) {
+      // Fallback: caller is authenticated but didn't send a refresh token —
+      // revoke whatever refresh token is on file for this account.
+      await Users.updateOne(
+        { _id: req.user._id },
+        { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } }
+      );
+    }
+
+    return res.status(200).json({ message: "Logged out successfully." });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Internal server error. Please try again later." });
+  }
+};
+
+module.exports = { registerUser, loginUser, getAllUsers, getUserById, updateUser, deleteUser, changeProfilePic, getTutorIdsFromPurchasedCourses, searchUsers, updatePassword, getTutorStudents, verifyOtp, resendOtp, refreshAccessToken, logoutUser };

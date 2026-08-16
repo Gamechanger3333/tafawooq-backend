@@ -366,6 +366,22 @@ const initializeSocketServer = (httpServer) => {
       }
     });
 
+    // Typing indicators — purely ephemeral, no DB writes. We just relay a
+    // "so-and-so is typing" ping to the other participant's personal room
+    // (the same room `message:send` delivers into), and let the client
+    // debounce/expire it locally.
+    socket.on('typing:start', ({ receiverId }) => {
+      if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
+
+      socket.to(receiverId).emit('typing:update', { userId, isTyping: true });
+    });
+
+    socket.on('typing:stop', ({ receiverId }) => {
+      if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
+
+      socket.to(receiverId).emit('typing:update', { userId, isTyping: false });
+    });
+
     // Mark a message as read
     socket.on('message:read', async ({ messageId }) => {
       try {

@@ -29,6 +29,8 @@ router.post("/register", authLimiter, userController.registerUser);
 router.post("/verify-otp", otpLimiter, userController.verifyOtp);
 router.post("/resend-otp", otpLimiter, userController.resendOtp);
 router.post("/login", authLimiter, userController.loginUser);
+router.post("/refresh-token", authLimiter, userController.refreshAccessToken);
+router.post("/logout", userController.logoutUser);
 
 // Protected routes (require authentication)
 router.get("/", auth, authorize('admin'), userController.getAllUsers);

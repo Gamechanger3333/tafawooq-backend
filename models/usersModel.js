@@ -28,6 +28,21 @@ const userSchema = new mongoose.Schema({
   resetTokenExpiresAt: {
     type: Date
   },
+  // Refresh token rotation: we store only a hash of the current refresh
+  // token (never the raw value) plus its expiry. Every time it's used to
+  // mint a new access token we issue a brand-new refresh token and
+  // overwrite this field, so a stolen-but-unused old token stops working
+  // the moment the real client rotates.
+  refreshTokenHash: {
+    type: String,
+    default: null,
+    select: false
+  },
+  refreshTokenExpiresAt: {
+    type: Date,
+    default: null,
+    select: false
+  },
   lastOtpRequestTime: {
     type: Date,
     default: null
