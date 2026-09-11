@@ -21,10 +21,7 @@ const {
 
     // Tutor earnings
     getTutorEarnings,
-    getTutorCoursesSales,
-
-    // Webhook
-    handleStripeWebhook
+    getTutorCoursesSales
 
 } = require('../controllers/stripeController');
 const auth = require("../middlewares/authMiddleware");
@@ -48,7 +45,8 @@ router.get('/transactions', auth, authorize('admin'), getAllTransactions);
 router.get('/admin-balance', auth, authorize('admin'), getAdminBalance);
 router.post('/admin-withdraw', auth, authorize('admin'), adminWithdrawFunds);
 
-// Webhook - this endpoint needs to be public
-router.post('/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+// NOTE: POST /stripe/webhook is intentionally registered in app.js, before
+// the global express.json() middleware — Stripe's signature check needs
+// the raw, unparsed body. See app.js for details. Do not re-add it here.
 
 module.exports = router;;

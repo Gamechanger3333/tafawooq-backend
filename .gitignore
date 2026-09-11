@@ -29,6 +29,13 @@ yarn-error.log*
 .env*.local
 .env
 
+# transient upload buffer (files are pushed to Cloudinary and deleted
+# immediately after — nothing here should ever be committed, and any
+# leftovers from a crashed upload are just local scratch data, not
+# something to ship in the repo)
+tmp/*
+!tmp/.gitkeep
+
 # vercel
 .vercel
 

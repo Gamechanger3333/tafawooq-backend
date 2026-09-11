@@ -59,6 +59,17 @@ app.use(cookieParser());
 // never be reachable over HTTP. Publicly hosted files are served from
 // Cloudinary's own URLs, not from this server.
 
+// Stripe webhook signature verification needs the *raw* request body, but
+// the global express.json() below would otherwise parse it first (Express
+// only lets one body parser consume the stream), silently breaking
+// signature verification for every webhook event. So this route is wired
+// up here, before express.json(), with its own express.raw() parser.
+app.post(
+    '/stripe/webhook',
+    express.raw({ type: 'application/json' }),
+    require('./controllers/stripeController').handleStripeWebhook
+);
+
 // CHANGED: Increased limit from "10kb" to "5mb" for bulk operations
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));

@@ -17,11 +17,26 @@ const forgotPasswordLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// verify-reset-otp guards a 6-digit code (1M combinations) — without a limit
+// here an attacker can brute-force it directly, bypassing the send-side
+// limiter above entirely. resend-reset-otp needs the same limit so it can't
+// be used to spam a victim's inbox.
+const otpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    message: {
+        success: false,
+        message: 'Too many attempts, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 
 router.post("/forgot-password", forgotPasswordLimiter, forgotPasswordController.forgotPassword);
-router.post("/verify-reset-otp", forgotPasswordController.verifyResetOTP);
-router.post("/reset-password", forgotPasswordController.resetPassword);
-router.post("/resend-reset-otp", forgotPasswordController.resendResetOTP);
+router.post("/verify-reset-otp", otpLimiter, forgotPasswordController.verifyResetOTP);
+router.post("/reset-password", otpLimiter, forgotPasswordController.resetPassword);
+router.post("/resend-reset-otp", forgotPasswordLimiter, forgotPasswordController.resendResetOTP);
 
 
 module.exports = router;

@@ -70,6 +70,12 @@ const getUserSessions = async (req, res) => {
     const { status, startDate, endDate } = req.query;
 
     try {
+        // IDOR fix: previously any authenticated user could read any other
+        // user's session list by passing their id in the URL.
+        if (req.user._id.toString() !== userId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only view your own sessions" });
+        }
+
         let query = {};
 
         if (role === "teacher") {
@@ -124,6 +130,24 @@ const updateSessionStatus = async (req, res) => {
     const { status, notes, meetingLink, location, cancellationReason } = req.body;
 
     try {
+        const existingSession = await Session.findById(sessionId);
+
+        if (!existingSession) {
+            return res.status(404).json({ message: "Session not found" });
+        }
+
+        // IDOR fix: previously any authenticated user could update ANY
+        // session's status (approve/reject/cancel someone else's booking)
+        // just by knowing its ID. Only the tutor and student on the
+        // session — or an admin — may change it.
+        const requesterId = req.user._id.toString();
+        const isParticipant =
+            existingSession.teacherId.toString() === requesterId || existingSession.studentId.toString() === requesterId;
+
+        if (!isParticipant && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You are not part of this session" });
+        }
+
         const updateData = { status };
 
         if (notes) updateData.notes = notes;
@@ -202,6 +226,12 @@ const addTeacherToFavorites = async (req, res) => {
     try {
         const { studentId, teacherId } = req.body;
 
+        // IDOR fix: previously any authenticated user could edit ANY
+        // student's favorites list by passing a different studentId.
+        if (req.user._id.toString() !== studentId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only manage your own favorites" });
+        }
+
         const student = await Users.findByIdAndUpdate(
             studentId,
             { $addToSet: { 'studentProfile.favoriteTeachers': teacherId } },
@@ -222,6 +252,10 @@ const addTeacherToFavorites = async (req, res) => {
 const removeTeacherFromFavorites = async (req, res) => {
     try {
         const { studentId, teacherId } = req.body;
+
+        if (req.user._id.toString() !== studentId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only manage your own favorites" });
+        }
 
         const student = await Users.findByIdAndUpdate(
             studentId,
@@ -278,6 +312,12 @@ const getTeacherAvailability = async (req, res) => {
 const getStudentDashboard = async (req, res) => {
     try {
         const { studentId } = req.params;
+
+        // IDOR fix: previously any authenticated user could view any
+        // student's dashboard by passing their id in the URL.
+        if (req.user._id.toString() !== studentId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only view your own dashboard" });
+        }
 
         // Get upcoming sessions
         const upcomingSessions = await Session.find({

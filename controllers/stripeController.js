@@ -380,6 +380,34 @@ const purchaseCourse = async (req, res) => {
       return_url: `${process.env.FRONTEND_URL}/payment-confirmation`
     });
 
+    // Only enroll the student if Stripe actually confirms the charge. Without
+    // this check, a card that requires 3D Secure/SCA action or is declined
+    // still resulted in "successful" enrollment below, since the code ran
+    // unconditionally regardless of paymentIntent.status.
+    if (paymentIntent.status !== 'succeeded') {
+      const paymentRecord = new stripemodel({
+        charge: JSON.stringify(paymentIntent),
+        userId: userId,
+        courseId: courseId,
+        chargeFor: 'appCharge',
+        amount: course.price,
+        status: paymentIntent.status,
+        paymentIntentId: paymentIntent.id,
+        plan: course.courseTitle
+      });
+
+      await paymentRecord.save();
+
+      return res.status(402).json({
+        success: false,
+        error:
+          paymentIntent.status === 'requires_action'
+            ? 'This payment requires additional authentication and could not be completed automatically. Please try a different card.'
+            : 'Payment could not be completed. Please check your card details and try again.',
+        paymentIntent: { id: paymentIntent.id, status: paymentIntent.status }
+      });
+    }
+
     // Save the payment record in our database
     const paymentRecord = new stripemodel({
       charge: JSON.stringify(paymentIntent),

@@ -25,6 +25,14 @@ const updateTeacherProfile = async (req, res) => {
         const { teacherId } = req.params;
         const updateData = req.body;
 
+        // IDOR fix: this previously trusted :teacherId from the URL with no
+        // check that the caller actually owns that profile — any logged-in
+        // user (including a student) could edit ANY teacher's profile,
+        // hourly rate, or availability just by changing the URL param.
+        if (req.user._id.toString() !== teacherId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only update your own teacher profile" });
+        }
+
         // Only allow updates to teacherProfile fields
         const allowedUpdates = [
             'teacherProfile.description',
@@ -67,6 +75,10 @@ const addSessionCourse = async (req, res) => {
         const { teacherId } = req.params;
         const { courseName, field, description, duration, price } = req.body;
 
+        if (req.user._id.toString() !== teacherId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only manage your own teacher profile" });
+        }
+
         const teacher = await Users.findByIdAndUpdate(
             teacherId,
             {
@@ -98,6 +110,10 @@ const removeSessionCourse = async (req, res) => {
     try {
         const { teacherId, courseId } = req.params;
 
+        if (req.user._id.toString() !== teacherId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only manage your own teacher profile" });
+        }
+
         const teacher = await Users.findByIdAndUpdate(
             teacherId,
             {
@@ -123,6 +139,10 @@ const updateTeacherAvailability = async (req, res) => {
     try {
         const { teacherId } = req.params;
         const { availability } = req.body;
+
+        if (req.user._id.toString() !== teacherId && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Unauthorized: You can only manage your own teacher profile" });
+        }
 
         const teacher = await Users.findByIdAndUpdate(
             teacherId,
