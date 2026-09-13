@@ -26,21 +26,33 @@ const { initializeSocketServer } = require("./sockets/socketServer");
 console.log("Starting application...");
 
 const app = express();
+   app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Initialize socket server
 const io = initializeSocketServer(server);
 
+// CORS allowed origins. Kept as a hardcoded list PLUS whatever is set in
+// the environment (FRONTEND_URL / WEBSITE_URL), so that deploying to a new
+// frontend URL (e.g. a new Vercel deployment domain) only requires
+// updating an environment variable on Render — not editing and
+// redeploying this file every time the frontend URL changes.
+const allowedOrigins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://tafawoq-frontend-opal.vercel.app",
+    "https://tafawooq-frontend-gilt.vercel.app",
+    "http://35.181.5.235",
+    "https://tafawouk.com",
+    "https://www.tafawouk.com",
+    "https://api.tafawouk.com"
+];
+
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
+if (process.env.WEBSITE_URL) allowedOrigins.push(process.env.WEBSITE_URL);
+
 const corsOptions = {
-    origin: [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://tafawoq-frontend-opal.vercel.app",
-        "http://35.181.5.235",
-        "https://tafawouk.com",
-        "https://www.tafawouk.com",
-        "https://api.tafawouk.com"
-    ],
+    origin: allowedOrigins,
     methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
     allowedHeaders: "X-Requested-With, Content-Type, Authorization",
     exposedHeaders: ['Content-Disposition'],
