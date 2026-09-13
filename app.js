@@ -26,6 +26,7 @@ const { initializeSocketServer } = require("./sockets/socketServer");
 console.log("Starting application...");
 
 const app = express();
+   app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Initialize socket server
