@@ -4,6 +4,17 @@ const jwt = require('jsonwebtoken');
 const { Types } = require('mongoose');
 const Messages = require("../models/messagesModel");
 const Users = require("../models/usersModel");
+const { DEMO_EMAIL } = require("../middlewares/demoGuard");
+
+// Chat runs over Socket.io, not the Express routes demoGuard.js already
+// protects — so that HTTP-only middleware never sees these events, and the
+// read-only demo account could otherwise message real tutors freely. This
+// mirrors the same rule at the socket layer for the events that persist
+// data (sending, deleting, and mass-broadcasting messages).
+const isDemoUser = (socket) => socket.user?.email?.toLowerCase() === DEMO_EMAIL;
+
+const DEMO_BLOCKED_MESSAGE =
+  "You're signed in to the read-only demo account, so this message wasn't sent. Create a free account to chat for real.";
 
 // Socket authentication middleware
 const authenticateSocket = (socket, next) => {
@@ -34,6 +45,7 @@ const authenticateSocket = (socket, next) => {
     socket.user = {
       id: userId,      // Add this for consistency with existing code
       userId: userId,  // Add this as fallback
+      email: decoded.email, // needed to identify the read-only demo account
       roles: decoded.roles || []
     };
     
@@ -214,6 +226,10 @@ const initializeSocketServer = (httpServer) => {
     // Send a new message
     socket.on('message:send', async ({ receiverId, content }, callback) => {
       try {
+        if (isDemoUser(socket)) {
+          return callback({ error: DEMO_BLOCKED_MESSAGE, demo: true });
+        }
+
         console.log(`[SOCKET] Sending message from ${userId} to ${receiverId}: ${content.substring(0, 20)}...`);
         
         if (!Types.ObjectId.isValid(receiverId)) {
@@ -259,6 +275,10 @@ const initializeSocketServer = (httpServer) => {
     // Broadcast a message to multiple recipients
     socket.on('message:broadcast', async ({ content, role }, callback) => {
       try {
+        if (isDemoUser(socket)) {
+          return callback({ error: DEMO_BLOCKED_MESSAGE, demo: true });
+        }
+
         console.log(`[SOCKET] Broadcasting message from ${userId} to role ${role || 'all'}: ${content.substring(0, 20)}...`);
         
         if (!content || content.trim() === '') {
@@ -327,6 +347,10 @@ const initializeSocketServer = (httpServer) => {
     // Delete a message
     socket.on('message:delete', async ({ messageId }, callback) => {
       try {
+        if (isDemoUser(socket)) {
+          return callback({ error: DEMO_BLOCKED_MESSAGE, demo: true });
+        }
+
         console.log(`[SOCKET] Deleting message ${messageId} by user ${userId}`);
         
         if (!Types.ObjectId.isValid(messageId)) {
@@ -364,22 +388,6 @@ const initializeSocketServer = (httpServer) => {
         console.error('[SOCKET] Error deleting message:', error);
         callback({ error: 'Failed to delete message' });
       }
-    });
-
-    // Typing indicators — purely ephemeral, no DB writes. We just relay a
-    // "so-and-so is typing" ping to the other participant's personal room
-    // (the same room `message:send` delivers into), and let the client
-    // debounce/expire it locally.
-    socket.on('typing:start', ({ receiverId }) => {
-      if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
-
-      socket.to(receiverId).emit('typing:update', { userId, isTyping: true });
-    });
-
-    socket.on('typing:stop', ({ receiverId }) => {
-      if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
-
-      socket.to(receiverId).emit('typing:update', { userId, isTyping: false });
     });
 
     // Mark a message as read
