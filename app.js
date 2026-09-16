@@ -22,6 +22,7 @@ const teacherProfileRoutes = require("./routes/teacherProfileRoutes.js");
 const assistantRoutes = require("./routes/assistantRoutes.js");
 const statsRoutes = require("./routes/statsRoutes.js");
 const { initializeSocketServer } = require("./sockets/socketServer");
+const { demoGuard } = require("./middlewares/demoGuard");
 
 console.log("Starting application...");
 
@@ -85,6 +86,13 @@ app.post(
 // CHANGED: Increased limit from "10kb" to "5mb" for bulk operations
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+
+// Read-only guard for the public demo account. Sits in front of every
+// route (but after the Stripe webhook above, which is machine-to-machine
+// and carries no user token) so a demo visitor can explore the whole app
+// without their writes reaching real tutors, real inboxes, or Stripe.
+// Real user accounts are completely unaffected by this.
+app.use(demoGuard);
 
 console.log("Setting up routes");
 // Routes
